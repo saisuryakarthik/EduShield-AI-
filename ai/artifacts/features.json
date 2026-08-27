@@ -1,0 +1,10 @@
+[
+    "known_device",
+    "location_deviation",
+    "failed_login_count",
+    "recent_password_reset",
+    "mfa_verified",
+    "phone_change_frequency",
+    "login_time_deviation",
+    "trust_score"
+]

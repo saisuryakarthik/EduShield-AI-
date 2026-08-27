@@ -1,0 +1,6 @@
+{
+    "risk_threshold": 50,
+    "risk_score_scale": "0-100",
+    "model_type": "logistic_regression",
+    "step_up_authentication": "IFHE_EMAIL_2FA"
+}
