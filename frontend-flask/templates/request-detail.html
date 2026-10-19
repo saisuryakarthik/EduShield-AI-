@@ -1,0 +1,335 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#08080d">
+    <title>Request Review — EduShield AI</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body class="dashboard-page detail-page">
+    <header class="app-navbar">
+        <a href="/mentor-dashboard" class="app-brand">
+            <span class="brand-mark">E</span>
+            <span class="brand-copy">
+                <strong>EduShield<span> AI</span></strong>
+                <small>MENTOR CONSOLE</small>
+            </span>
+        </a>
+
+        <div class="navbar-right">
+            <span class="review-mode"><span></span> Secure review</span>
+            <a href="/logout" class="logout-link">Log out <span>↗</span></a>
+        </div>
+    </header>
+
+    <main class="detail-main">
+        <a href="/mentor-dashboard" class="detail-back">
+            <span>←</span> Back to dashboard
+        </a>
+
+        <section class="detail-hero">
+            <div>
+                <div class="eyebrow"><span class="eyebrow-dot"></span> REQUEST REVIEW</div>
+                <h1>Identity verification</h1>
+                <p>Review the request, assess the security signals, and make your decision.</p>
+            </div>
+            <span class="status-pill detail-status status-{{ request.status|lower }}">
+                <span class="status-dot"></span>{{ request.status }}
+            </span>
+        </section>
+
+        <section class="detail-overview">
+            <div class="detail-overview-item">
+                <span class="detail-label">REQUEST ID</span>
+                <code>{{ request.request_id }}</code>
+            </div>
+            <div class="detail-overview-item">
+                <span class="detail-label">STUDENT ID</span>
+                <strong>{{ request.user_id }}</strong>
+            </div>
+            <div class="detail-overview-item">
+                <span class="detail-label">SUBMITTED</span>
+                <strong>{{ request.requested_at }}</strong>
+            </div>
+        </section>
+
+        <div class="detail-layout">
+            <div class="detail-primary-column">
+                <section class="detail-panel">
+                    <div class="detail-panel-heading">
+                        <div class="detail-heading-icon">↔</div>
+                        <div>
+                            <h2>Phone number change</h2>
+                            <p>Compare the current and requested numbers.</p>
+                        </div>
+                    </div>
+
+                    <div class="phone-change-comparison">
+                        <div class="phone-number-card">
+                            <span class="phone-card-label">CURRENT NUMBER</span>
+                            <strong>{{ request.old_phone }}</strong>
+                            <span class="phone-card-caption"><span class="mini-dot"></span> Registered</span>
+                        </div>
+                        <div class="phone-change-arrow">→</div>
+                        <div class="phone-number-card phone-number-new">
+                            <span class="phone-card-label">NEW NUMBER</span>
+                            <strong>{{ request.new_phone }}</strong>
+                            <span class="phone-card-caption"><span class="mini-dot"></span> Requested</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="detail-panel">
+                    <div class="detail-panel-heading">
+                        <div class="detail-heading-icon">⌘</div>
+                        <div>
+                            <h2>Security signals</h2>
+                            <p>Context gathered to help evaluate this request.</p>
+                        </div>
+                    </div>
+
+                    <div class="security-signal-grid">
+                        <div class="signal-card">
+                            <span class="signal-label">Known device</span>
+                            <strong>{{ security_context.known_device }}</strong>
+                        </div>
+                        <div class="signal-card">
+                            <span class="signal-label">Location deviation</span>
+                            <strong>{{ "%.2f"|format(security_context.location_deviation) }}</strong>
+                        </div>
+                        <div class="signal-card">
+                            <span class="signal-label">Failed login attempts</span>
+                            <strong>{{ security_context.failed_login_count }}</strong>
+                        </div>
+                        <div class="signal-card">
+                            <span class="signal-label">Recent password reset</span>
+                            <strong>{{ security_context.recent_password_reset }}</strong>
+                        </div>
+                        <div class="signal-card">
+                            <span class="signal-label">MFA verified</span>
+                            <strong>{{ security_context.mfa_verified }}</strong>
+                        </div>
+                        <div class="signal-card">
+                            <span class="signal-label">Phone change frequency</span>
+                            <strong>{{ security_context.phone_change_frequency }}</strong>
+                        </div>
+                        <div class="signal-card">
+                            <span class="signal-label">Login time deviation</span>
+                            <strong>{{ "%.2f"|format(security_context.login_time_deviation) }}</strong>
+                        </div>
+                        <div class="signal-card signal-trust">
+                            <span class="signal-label">Trust score</span>
+                            <strong>{{ "%.2f"|format(security_context.trust_score) }}</strong>
+                        </div>
+                    </div>
+                </section>
+
+                {% if ai_assessment %}
+                <section class="detail-panel">
+                    <div class="detail-panel-heading">
+                        <div class="detail-heading-icon">✳</div>
+                        <div>
+                            <h2>AI risk assessment</h2>
+                            <p>Automated analysis to support your review.</p>
+                        </div>
+                    </div>
+
+                    <div class="risk-assessment-card">
+                        <div class="risk-score-block">
+                            <span class="signal-label">RISK SCORE</span>
+                            <div class="risk-score-value">{{ ai_assessment.risk_score|round(2) }}</div>
+                            <span class="risk-score-caption">AI-generated assessment</span>
+                        </div>
+                        <div class="risk-level-block">
+                            <span class="signal-label">ASSESSED RISK LEVEL</span>
+                            <span class="risk-badge risk-{{ ai_assessment.risk_level|lower }}">
+                                <span class="status-dot"></span>
+                                {% if ai_assessment.risk_level == 'HIGH' %}
+                                    HIGH RISK
+                                {% elif ai_assessment.risk_level == 'MEDIUM' %}
+                                    MEDIUM RISK
+                                {% else %}
+                                    LOW RISK
+                                {% endif %}
+                            </span>
+                            <p>Use this assessment alongside the security signals and authentication status.</p>
+                        </div>
+                    </div>
+
+                    {% if risk_factor_details %}
+                    <div class="risk-factors-block">
+                        <div class="risk-factors-heading">
+                            <h3>Detected risk factors</h3>
+                            <span>{{ risk_factor_details|length }} identified</span>
+                        </div>
+
+                        <div class="factor-list">
+                            {% for factor in risk_factor_details %}
+                            <div class="risk-factor-item {% if factor.level == 'danger' %}danger{% elif factor.level == 'warning' %}warning{% else %}info{% endif %}">
+                                <div class="factor-icon">
+                                    {% if factor.level == 'danger' %}
+                                        !
+                                    {% elif factor.level == 'warning' %}
+                                        ⚡
+                                    {% else %}
+                                        i
+                                    {% endif %}
+                                </div>
+                                <div class="factor-details">
+                                    <strong>{{ factor.name }}</strong>
+                                    <p>{{ factor.description }}</p>
+                                </div>
+                                <span class="factor-level">{{ factor.level|upper }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="no-risk-factors">
+                        <span>✓</span>
+                        <div>
+                            <strong>No risk factors reported</strong>
+                            <p>No risk factors were returned by the assessment.</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </section>
+                {% endif %}
+            </div>
+
+            <aside class="detail-sidebar">
+                <section class="detail-panel auth-panel">
+                    <div class="detail-panel-heading">
+                        <div class="detail-heading-icon">◎</div>
+                        <div>
+                            <h2>Authentication</h2>
+                            <p>Parent verification: SMS and email</p>
+                        </div>
+                    </div>
+
+                    <div class="auth-channel-list">
+                        {% for ch in otp_channels %}
+                        <div class="auth-state {{ 'auth-verified' if ch.verified else 'auth-pending' }}">
+                            <span class="auth-state-icon">{{ '✓' if ch.verified else ('🔒' if ch.locked else '!') }}</span>
+                            <div>
+                                <strong>{{ 'SMS code' if ch.channel == 'SMS' else 'Email code' }}: {{ 'verified' if ch.verified else ('locked' if ch.locked else 'pending') }}</strong>
+                                <p>{{ ch.attempts }} failed attempt(s)</p>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="auth-state auth-pending">
+                            <span class="auth-state-icon">!</span>
+                            <div><strong>No verification codes on record</strong></div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% if request.auth_status == 'VERIFIED' %}
+                    <p class="decision-hint">Both codes verified. The request is ready for your decision.</p>
+                    {% else %}
+                    <p class="decision-hint">Approval is locked until both the SMS and email codes are verified.</p>
+                    {% endif %}
+                </section>
+
+                {% if request.status in ['PENDING', 'SECURITY_HOLD'] %}
+                <section class="detail-panel decision-panel">
+                    <div class="detail-panel-heading">
+                        <div class="detail-heading-icon">✎</div>
+                        <div>
+                            <h2>Review decision</h2>
+                            <p>Your decision is final.</p>
+                        </div>
+                    </div>
+
+                    {% if error %}
+                    <div class="error-message">{{ error }}</div>
+                    {% endif %}
+
+                    <form method="POST" class="decision-form" id="decision-form">
+                        <label class="decision-label" for="reason">Reason <span>(optional)</span></label>
+                        <textarea id="reason" name="reason" rows="4"
+                            placeholder="Add context for your decision..."></textarea>
+
+                        <p class="decision-hint">A reason is especially helpful when rejecting a request.</p>
+
+                        <button type="submit" name="decision" value="APPROVED"
+                            class="decision-action decision-approve"
+                            data-decision="APPROVED"{% if request.auth_status != 'VERIFIED' or request.status == 'SECURITY_HOLD' %} disabled title="Parent SMS and email verification must be completed first"{% endif %}>
+                            <span>✓</span> Approve request
+                        </button>
+
+                        <button type="submit" name="decision" value="REJECTED"
+                            class="decision-action decision-reject"
+                            data-decision="REJECTED">
+                            <span>×</span> Reject request
+                        </button>
+
+                        <div class="decision-warning">
+                            <span>ⓘ</span>
+                            <p>
+                                Approval updates the phone number to <strong>{{ request.new_phone }}</strong>.
+                                Rejection keeps the existing number <strong>{{ request.old_phone }}</strong>.
+                            </p>
+                        </div>
+                    </form>
+                </section>
+                {% else %}
+                <section class="detail-panel decision-panel">
+                    <div class="detail-panel-heading">
+                        <div class="detail-heading-icon">✓</div>
+                        <div>
+                            <h2>Final decision</h2>
+                            <p>This request has already been reviewed.</p>
+                        </div>
+                    </div>
+
+                    <div class="final-decision-state {% if request.status == 'APPROVED' %}final-approved{% else %}final-rejected{% endif %}">
+                        <strong>
+                            {% if request.status == 'APPROVED' %}
+                                ✓ Request approved
+                            {% else %}
+                                × Request rejected
+                            {% endif %}
+                        </strong>
+                        <p>Reviewed at {{ request.reviewed_at }}</p>
+
+                        {% if request.status == 'REJECTED' and request.rejection_reason %}
+                        <div class="rejection-reason">
+                            <span>REJECTION REASON</span>
+                            <p>{{ request.rejection_reason }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </section>
+                {% endif %}
+            </aside>
+        </div>
+
+        <footer class="detail-footer">
+            <span>EduShield AI</span>
+            <span>Identity protection · Mentor review</span>
+        </footer>
+    </main>
+
+    <script>
+        const decisionForm = document.getElementById("decision-form");
+
+        if (decisionForm) {
+            decisionForm.querySelectorAll("[data-decision]").forEach((button) => {
+                button.addEventListener("click", (event) => {
+                    const decision = button.dataset.decision;
+                    const message = decision === "APPROVED"
+                        ? "Approve this phone change? This decision is final."
+                        : "Reject this phone change? This decision is final.";
+
+                    if (!window.confirm(message)) {
+                        event.preventDefault();
+                    }
+                });
+            });
+        }
+    </script>
+</body>
+</html>

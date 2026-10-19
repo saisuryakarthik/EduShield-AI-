@@ -1,0 +1,324 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#08080d">
+    <title>Mentor Console | EduShield AI</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body class="dashboard-page mentor-page">
+<div class="mentor-dashboard">
+
+    <header class="app-navbar mentor-navbar">
+        <a href="/mentor-dashboard" class="app-brand">
+            <div class="brand-mark">🛡️</div>
+            <div class="brand-copy">
+                <strong>EduShield<span> AI</span></strong>
+                <small>MENTOR SECURITY CONSOLE</small>
+            </div>
+        </a>
+
+        <div class="mentor-profile">
+            <div class="mentor-avatar">M</div>
+            <div class="mentor-profile-info">
+                <span>MENTOR ACCOUNT</span>
+                <strong>{{ mentor_name }}</strong>
+                <small>ID: {{ mentor_id }}</small>
+            </div>
+            <a href="/logout" class="logout-link">Log out <span>↗</span></a>
+        </div>
+    </header>
+
+    <main class="mentor-container">
+
+        {% if error %}
+        <div class="inline-notice mentor-error" role="alert">
+            <span>!</span> {{ error }}
+        </div>
+        {% endif %}
+
+        <section class="mentor-hero">
+            <div class="mentor-hero-content">
+                <div class="eyebrow"><span class="live-indicator"></span> AI-POWERED SECURITY</div>
+                <h1>Identity request<br><span>review center.</span></h1>
+                <p>
+                    Review student phone-change requests, inspect security signals,
+                    and make informed approval decisions.
+                </p>
+
+                <div class="mentor-hero-points">
+                    <span><span class="point-check">✓</span> AI risk analysis</span>
+                    <span><span class="point-check">✓</span> Manual review</span>
+                </div>
+            </div>
+
+            <div class="mentor-hero-visual" aria-hidden="true">
+                <div class="mentor-orbit mentor-orbit-one"></div>
+                <div class="mentor-orbit mentor-orbit-two"></div>
+                <div class="mentor-shield">🛡️</div>
+                <div class="mentor-float-card">
+                    <span class="live-indicator"></span>
+                    <div>
+                        <strong>Monitoring active</strong>
+                        <small>Security engine online</small>
+                    </div>
+                </div>
+                <div class="mentor-visual-caption">IDENTITY PROTECTION <span>01 / ACTIVE</span></div>
+            </div>
+        </section>
+
+        <section class="mentor-overview">
+            <div class="mentor-overview-copy">
+                <span class="section-kicker">WORKSPACE</span>
+                <h2>Request overview</h2>
+                <p>Track and review incoming identity-change activity.</p>
+            </div>
+
+            <div class="mentor-overview-stat">
+                <span class="mentor-stat-icon">▤</span>
+                <div>
+                    <strong>{{ requests|length }}</strong>
+                    <span>Requests in view</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="mentor-filter-panel">
+            <div class="mentor-filter-heading">
+                <div>
+                    <span class="section-kicker">FILTER BY STATUS</span>
+                    <h3>Find a request</h3>
+                </div>
+                <span class="filter-small-label">REQUESTS <span>↘</span></span>
+            </div>
+
+            <nav class="mentor-filters" aria-label="Filter requests by status">
+                <a href="/mentor-dashboard?status=all"
+                   class="mentor-filter-btn {% if not current_filter or current_filter|lower == 'all' %}active{% endif %}"
+                   {% if not current_filter or current_filter|lower == 'all' %}aria-current="page"{% endif %}>
+                    <span class="filter-symbol">▦</span> All requests
+                </a>
+
+                <a href="/mentor-dashboard?status=PENDING"
+                   class="mentor-filter-btn {% if current_filter == 'PENDING' %}active{% endif %}"
+                   {% if current_filter == 'PENDING' %}aria-current="page"{% endif %}>
+                    <span class="filter-symbol">◷</span> Pending
+                </a>
+
+                <a href="/mentor-dashboard?status=APPROVED"
+                   class="mentor-filter-btn {% if current_filter == 'APPROVED' %}active{% endif %}"
+                   {% if current_filter == 'APPROVED' %}aria-current="page"{% endif %}>
+                    <span class="filter-symbol">✓</span> Approved
+                </a>
+
+                <a href="/mentor-dashboard?status=REJECTED"
+                   class="mentor-filter-btn {% if current_filter == 'REJECTED' %}active{% endif %}"
+                   {% if current_filter == 'REJECTED' %}aria-current="page"{% endif %}>
+                    <span class="filter-symbol">×</span> Rejected
+                </a>
+            </nav>
+        </section>
+
+        <section class="mentor-requests-section">
+            <div class="mentor-section-heading">
+                <div>
+                    <span class="section-kicker">SECURITY ACTIVITY</span>
+                    <h2>Phone change requests</h2>
+                    <p>Review each request and its AI-generated risk assessment.</p>
+                </div>
+
+                <div class="mentor-request-count">
+                    <strong>{{ requests|length }}</strong>
+                    <span>REQUEST{% if requests|length != 1 %}S{% endif %}</span>
+                </div>
+            </div>
+
+            {% if requests %}
+            <div class="mentor-request-list">
+                {% for request in requests %}
+                <article class="mentor-request-card">
+
+                    <div class="mentor-request-header">
+                        <div class="mentor-request-identity">
+                            <div class="mentor-request-icon">⌘</div>
+                            <div class="mentor-request-title">
+                                <span class="mentor-request-type">PHONE CHANGE REQUEST</span>
+                                <h3>{{ request.request_id }}</h3>
+                                <p>Student ID · {{ request.user_id }}</p>
+                            </div>
+                        </div>
+
+                        <div class="mentor-request-statuses">
+                            <span class="mentor-status-badge status-{{ request.status|lower }}">
+                                <span class="status-dot"></span>{{ request.status }}
+                            </span>
+                            <span class="mentor-status-badge status-{{ request.auth_status|lower }}">
+                                Auth · {{ request.auth_status }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="mentor-request-info">
+                        <div class="mentor-info-item">
+                            <span>STUDENT ID</span>
+                            <strong>{{ request.user_id }}</strong>
+                        </div>
+                        <div class="mentor-info-item">
+                            <span>NEW PHONE</span>
+                            <strong>{{ request.new_phone }}</strong>
+                        </div>
+                        <div class="mentor-info-item">
+                            <span>REQUEST STATUS</span>
+                            <strong>{{ request.status }}</strong>
+                        </div>
+                        <div class="mentor-info-item">
+                            <span>AUTHENTICATION</span>
+                            <strong>{{ request.auth_status }}</strong>
+                        </div>
+                    </div>
+
+                    <div class="mentor-ai-panel">
+                        <div class="mentor-ai-header">
+                            <div class="mentor-ai-title">
+                                <div class="ai-brain-icon">✳</div>
+                                <div>
+                                    <span>EDUSHIELD INTELLIGENCE</span>
+                                    <strong>AI security assessment</strong>
+                                </div>
+                            </div>
+                            <span class="mentor-ai-model">
+                                {{ request.model_version if request.model_version else 'AI MODEL' }}
+                            </span>
+                        </div>
+
+                        <div class="mentor-ai-main">
+                            <div class="mentor-risk-score">
+                                <span>RISK SCORE</span>
+                                <div class="risk-number">
+                                    <strong>{% if request.risk_score is not none %}{{ request.risk_score }}{% else %}—{% endif %}</strong>
+                                    <small>/ 100</small>
+                                </div>
+                                <span class="risk-score-caption">AI-estimated risk</span>
+                            </div>
+
+                            <div class="mentor-risk-level">
+                                {% if request.risk_level == 'HIGH' %}
+                                <div class="risk-indicator risk-high">!</div>
+                                <div>
+                                    <strong class="risk-text-high">HIGH RISK</strong>
+                                    <span>Mentor review required</span>
+                                </div>
+                                {% elif request.risk_level == 'MEDIUM' %}
+                                <div class="risk-indicator risk-medium">!</div>
+                                <div>
+                                    <strong class="risk-text-medium">MEDIUM RISK</strong>
+                                    <span>Additional review recommended</span>
+                                </div>
+                                {% elif request.risk_level == 'LOW' %}
+                                <div class="risk-indicator risk-low">✓</div>
+                                <div>
+                                    <strong class="risk-text-low">LOW RISK</strong>
+                                    <span>No major concerns identified</span>
+                                </div>
+                                {% else %}
+                                <div class="risk-indicator risk-unknown">?</div>
+                                <div>
+                                    <strong>RISK UNKNOWN</strong>
+                                    <span>Assessment unavailable</span>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="mentor-risk-bar">
+                            <div class="mentor-risk-track">
+                                {% if request.risk_score is not none %}
+                                <div class="mentor-risk-fill risk-fill-{{ request.risk_level|lower if request.risk_level else 'unknown' }}"
+                                     style="width: {{ [[request.risk_score|float, 0]|max, 100]|min }}%;">
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="risk-scale">
+                                <span>LOW <small>0–34</small></span>
+                                <span>MEDIUM <small>35–69</small></span>
+                                <span>HIGH <small>70–100</small></span>
+                            </div>
+                        </div>
+
+                        <div class="mentor-security-signals">
+                            <div class="signals-header">
+                                <strong><span>⌁</span> Security signals</strong>
+                                <span class="signals-count">
+                                    {{ request.risk_factors|length if request.risk_factors else 0 }} detected
+                                </span>
+                            </div>
+
+                            {% if request.risk_factors %}
+                            <ul class="mentor-signal-list">
+                                {% for factor in request.risk_factors %}
+                                <li><span class="signal-dot"></span>{{ factor }}</li>
+                                {% endfor %}
+                            </ul>
+                            {% else %}
+                            <div class="no-security-signals">
+                                <span>✓</span>
+                                <p>No elevated security signals reported.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        {% if request.risk_level == 'HIGH' %}
+                        <div class="mentor-review-warning">
+                            <span class="warning-icon">!</span>
+                            <div>
+                                <strong>High-risk request</strong>
+                                <span>Review the request details and security evidence carefully before making a decision.</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mentor-request-footer">
+                        <div class="mentor-request-meta">
+                            <span class="footer-lock">⌑</span>
+                            <div>
+                                <strong>Manual review</strong>
+                                <span>Inspect details before deciding</span>
+                            </div>
+                        </div>
+                        <a href="/request-detail/{{ request.request_id }}" class="mentor-view-btn">
+                            Review request <span>↗</span>
+                        </a>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+
+            {% else %}
+            <div class="mentor-empty-state">
+                <div class="mentor-empty-icon">⌕</div>
+                <span class="section-kicker">ALL CLEAR</span>
+                <h3>No requests found</h3>
+                <p>There are no phone-change requests in this view right now.</p>
+                {% if current_filter and current_filter|lower != 'all' %}
+                <a href="/mentor-dashboard?status=all" class="button-secondary">
+                    View all requests →
+                </a>
+                {% endif %}
+                <small>Security monitoring remains active.</small>
+            </div>
+            {% endif %}
+        </section>
+
+        <footer class="mentor-footer">
+            <span><span class="footer-brand-mark">🛡️</span> EduShield AI</span>
+            <span>AI-assisted identity security <i></i> Mentor workspace</span>
+        </footer>
+
+    </main>
+</div>
+</body>
+</html>

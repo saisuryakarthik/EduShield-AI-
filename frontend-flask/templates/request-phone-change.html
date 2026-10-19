@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#08080d">
+    <title>New Phone Request | EduShield AI</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body class="dashboard-page">
+
+    <header class="app-navbar">
+        <a href="/student-dashboard" class="app-brand">
+            <span class="brand-mark">E</span>
+            <span class="brand-copy">
+                <strong>EduShield<span class="brand-ai"> AI</span></strong>
+                <small>IDENTITY SECURITY</small>
+            </span>
+        </a>
+        <a href="/logout" class="logout-link">Sign out ↗</a>
+    </header>
+
+    <main class="form-page-container">
+
+        <a href="/student-dashboard" class="back-link">← Back to dashboard</a>
+
+        <section class="phone-request-layout">
+
+            <div class="phone-request-intro">
+                <div class="eyebrow">
+                    <span class="eyebrow-dot"></span>
+                    ACCOUNT MANAGEMENT
+                </div>
+
+                <h1>A new number.<br><span>Same secure identity.</span></h1>
+
+                <p>
+                    Submit your new phone number for verification.
+                    EduShield will help protect your account throughout
+                    the change.
+                </p>
+
+                <div class="security-feature-list">
+                    <div class="security-feature">
+                        <span class="feature-icon">01</span>
+                        <div>
+                            <strong>Submit your request</strong>
+                            <p>Enter the phone number you want to register.</p>
+                        </div>
+                    </div>
+
+                    <div class="security-feature">
+                        <span class="feature-icon">02</span>
+                        <div>
+                            <strong>Parent verification</strong>
+                            <p>Your parent confirms the change with an SMS code and an email code.</p>
+                        </div>
+                    </div>
+
+                    <div class="security-feature">
+                        <span class="feature-icon">03</span>
+                        <div>
+                            <strong>Mentor review</strong>
+                            <p>Your request goes through the approval process.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="privacy-note">
+                    <span>◈</span>
+                    <div>
+                        <strong>Security-first verification</strong>
+                        <p>Your request includes location verification as required by EduShield.</p>
+                    </div>
+                </div>
+            </div>
+
+            <section class="phone-form-card" aria-labelledby="form-title">
+
+                <div class="form-card-heading">
+                    <div class="form-card-icon">↗</div>
+                    <div class="eyebrow">NEW REQUEST</div>
+                    <h2 id="form-title">Change phone number</h2>
+                    <p>Enter your details to begin the verification process.</p>
+                </div>
+
+                {% if error %}
+                <div class="error-message" role="alert" aria-live="polite">
+                    {{ error }}
+                </div>
+                {% endif %}
+
+                <div id="location-status" class="info-box" role="status" aria-live="polite">
+                    📍 Detecting your location...
+                </div>
+
+                <form method="POST" id="phone-change-form" class="login-form">
+
+                    <input type="hidden" id="latitude" name="latitude">
+                    <input type="hidden" id="longitude" name="longitude">
+
+                    <div class="form-group">
+                        <label for="old_phone">Current phone number</label>
+                        <input type="text" id="old_phone" value="{{ old_phone }}" disabled
+                            placeholder="Current number unavailable">
+                        <small>Your existing number is read-only.</small>
+                    </div>
+
+
+                    <div class="form-group">
+                        <label for="new_phone">
+                            New phone number <span class="required">*</span>
+                        </label>
+
+                        <input type="tel" id="new_phone" name="new_phone" value="{{ new_phone|default('', true) }}"
+                            placeholder="Enter 10-digit number" inputmode="numeric" autocomplete="tel-national"
+                            maxlength="10" pattern="[0-9]{10}" required aria-describedby="phone-hint">
+
+                        <small id="phone-hint">
+                            Use exactly 10 digits, without a country code.
+                        </small>
+                    </div>
+
+                    <div class="form-actions">
+                        <a href="/student-dashboard" class="button-secondary">
+                            Cancel
+                        </a>
+                        <button type="submit" class="button-primary" id="submit-btn" disabled>
+                            Continue <span>→</span>
+                        </button>
+                    </div>
+                </form>
+
+                <div class="form-security-footer">
+                    <span>♢</span>
+                    Your request will be reviewed before completion.
+                </div>
+            </section>
+
+        </section>
+
+        <footer class="dashboard-footer form-page-footer">
+            <a href="/student-dashboard" class="footer-brand">EDUSHIELD<span> AI</span></a>
+            <span>Secure identity verification</span>
+        </footer>
+    </main>
+
+    <script>
+        const form = document.getElementById("phone-change-form");
+        const latitudeInput = document.getElementById("latitude");
+        const longitudeInput = document.getElementById("longitude");
+        const locationStatus = document.getElementById("location-status");
+        const submitButton = document.getElementById("submit-btn");
+        const phoneInput = document.getElementById("new_phone");
+
+        let locationReady = false;
+        let locationRequestInProgress = false;
+
+        function setStatus(message) {
+            locationStatus.textContent = message;
+        }
+
+        function getLocation() {
+            if (!navigator.geolocation) {
+                setStatus("❌ This browser does not support location services.");
+                return;
+            }
+
+            if (locationRequestInProgress) return;
+
+            locationRequestInProgress = true;
+            submitButton.disabled = true;
+            setStatus("📍 Detecting your location...");
+
+            navigator.geolocation.getCurrentPosition(
+                function (position) {
+                    locationRequestInProgress = false;
+
+                    const latitude = position.coords.latitude;
+                    const longitude = position.coords.longitude;
+
+                    if (
+                        !Number.isFinite(latitude) ||
+                        !Number.isFinite(longitude) ||
+                        latitude < -90 || latitude > 90 ||
+                        longitude < -180 || longitude > 180
+                    ) {
+                        locationReady = false;
+                        setStatus("❌ Invalid location. Please try again.");
+                        return;
+                    }
+
+                    latitudeInput.value = latitude;
+                    longitudeInput.value = longitude;
+                    locationReady = true;
+
+                    setStatus("📍 Location verified. Ready to submit.");
+                    updateSubmitState();
+                },
+                function (error) {
+                    locationRequestInProgress = false;
+                    locationReady = false;
+                    submitButton.disabled = true;
+
+                    if (error.code === 1) {
+                        setStatus("❌ Allow location access in your browser to continue.");
+                    } else if (error.code === 2) {
+                        setStatus("⚠️ Location unavailable. Please try again.");
+                    } else if (error.code === 3) {
+                        setStatus("⚠️ Location timed out. Please retry.");
+                    } else {
+                        setStatus("❌ Unable to retrieve location.");
+                    }
+                },
+                {
+                    enableHighAccuracy: false,
+                    timeout: 15000,
+                    maximumAge: 120000
+                }
+            );
+        }
+
+        function updateSubmitState() {
+            const validPhone = /^[0-9]{10}$/.test(phoneInput.value);
+            submitButton.disabled = !(locationReady && validPhone);
+        }
+
+        phoneInput.addEventListener("input", function () {
+            phoneInput.value = phoneInput.value.replace(/\D/g, "").slice(0, 10);
+            updateSubmitState();
+        });
+
+        window.addEventListener("load", getLocation);
+
+        form.addEventListener("submit", function (event) {
+            const latitude = Number(latitudeInput.value);
+            const longitude = Number(longitudeInput.value);
+            const validLocation =
+                locationReady &&
+                Number.isFinite(latitude) &&
+                Number.isFinite(longitude) &&
+                latitude >= -90 && latitude <= 90 &&
+                longitude >= -180 && longitude <= 180;
+
+            if (!validLocation) {
+                event.preventDefault();
+                setStatus("❌ Location access is required. Please retry.");
+                getLocation();
+                return;
+            }
+
+            if (!/^[0-9]{10}$/.test(phoneInput.value)) {
+                event.preventDefault();
+                phoneInput.focus();
+            }
+        });
+    </script>
+
+</body>
+
+</html>

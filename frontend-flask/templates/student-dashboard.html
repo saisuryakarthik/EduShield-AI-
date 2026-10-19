@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#08080d">
+
+    <title>Student Dashboard | EduShield AI</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body class="dashboard-page">
+
+    <header class="app-navbar">
+        <a href="/student-dashboard" class="app-brand">
+            <span class="brand-mark">E</span>
+            <span class="brand-copy">
+                <strong>EduShield<span class="brand-ai"> AI</span></strong>
+                <small>STUDENT SECURITY</small>
+            </span>
+        </a>
+
+        <div class="navbar-right">
+            <span class="user-chip">
+                <span class="online-dot"></span>
+                {{ user_name }}
+            </span>
+            <a href="/logout" class="logout-link">Sign out ↗</a>
+        </div>
+    </header>
+
+    <main class="dashboard-container">
+
+        {% if error %}
+        <div class="dashboard-alert" role="alert">
+            <span>!</span>
+            <div>
+                <strong>Connection issue</strong>
+                <p>{{ error }}</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Welcome -->
+        <section class="welcome-panel">
+            <div class="welcome-copy">
+                <div class="eyebrow">
+                    <span class="eyebrow-dot"></span>
+                    YOUR SECURITY SPACE
+                </div>
+
+                <h1>Stay in control,<br><span>stay protected.</span></h1>
+
+                <p>
+                    Manage your phone number changes and follow every
+                    verification step from one secure place.
+                </p>
+
+                <a href="/request-phone-change" class="button-primary">
+                    <span>＋</span> Request phone change
+                    <span class="button-arrow">↗</span>
+                </a>
+            </div>
+
+            <div class="welcome-art" aria-hidden="true">
+                <div class="orbit orbit-one"></div>
+                <div class="orbit orbit-two"></div>
+                <div class="orbit orbit-three"></div>
+                <div class="shield-core">
+                    <svg viewBox="0 0 100 112" fill="none">
+                        <path d="M50 5L88 20V49C88 74 72 94 50 106C28 94 12 74 12 49V20L50 5Z" stroke="currentColor"
+                            stroke-width="3" />
+                        <path d="M32 55L44 67L69 40" stroke="currentColor" stroke-width="5" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                    </svg>
+                </div>
+                <span class="art-label art-label-top">IDENTITY</span>
+                <span class="art-label art-label-bottom">PROTECTED / 01</span>
+            </div>
+
+            <div class="welcome-bottom">
+                <span><span class="online-dot"></span> SECURITY WORKSPACE</span>
+                <span>STUDENT ID · {{ user_id }}</span>
+            </div>
+        </section>
+
+        <!-- Overview -->
+        <section class="overview-grid" aria-label="Account overview">
+
+            <article class="metric-card">
+                <div class="metric-top">
+                    <span class="metric-icon violet-icon">◈</span>
+                    <span class="metric-label">TOTAL REQUESTS</span>
+                </div>
+                <strong class="metric-value">{{ requests|length }}</strong>
+                <span class="metric-foot">Your request history</span>
+            </article>
+
+            <article class="metric-card">
+                <div class="metric-top">
+                    <span class="metric-icon amber-icon">◷</span>
+                    <span class="metric-label">IN PROGRESS</span>
+                </div>
+                <strong class="metric-value">
+                    {{ requests|selectattr('status', 'equalto', 'PENDING')|list|length }}
+                </strong>
+                <span class="metric-foot">Awaiting a decision</span>
+            </article>
+
+            <article class="metric-card">
+                <div class="metric-top">
+                    <span class="metric-icon green-icon">✓</span>
+                    <span class="metric-label">APPROVED</span>
+                </div>
+                <strong class="metric-value">
+                    {{ requests|selectattr('status', 'equalto', 'APPROVED')|list|length }}
+                </strong>
+                <span class="metric-foot">Approved requests</span>
+            </article>
+
+            <article class="metric-card account-metric">
+                <div class="metric-top">
+                    <span class="metric-icon blue-icon">⌁</span>
+                    <span class="metric-label">ACCOUNT</span>
+                </div>
+                <strong class="metric-value metric-word">Protected</strong>
+                <span class="metric-foot">
+                    {{ user_name }} · {{ user_id }}
+                </span>
+            </article>
+
+        </section>
+
+        <!-- Requests -->
+        <section class="activity-section">
+
+            <div class="activity-heading">
+                <div>
+                    <div class="eyebrow">REQUEST MANAGEMENT</div>
+                    <h2>Your security activity<span class="heading-period">.</span></h2>
+                    <p>Track, manage, and follow up on your phone change requests.</p>
+                </div>
+
+                <a href="/request-phone-change" class="button-secondary">
+                    ＋ New request
+                </a>
+            </div>
+
+            {% if requests %}
+
+            <div class="request-list">
+
+                {% for request in requests %}
+
+                <article class="request-card">
+
+                    <div class="request-card-heading">
+                        <div class="request-identity">
+                            <div class="request-icon">↗</div>
+                            <div>
+                                <span class="request-category">PHONE CHANGE</span>
+                                <h3>Request #{{ request.request_id }}</h3>
+                            </div>
+                        </div>
+
+                        <span class="status-pill status-{{ request.status|lower|replace('_', '-') }}">
+                            <span class="status-dot"></span>
+                            {{ request.status|replace('_', ' ') }}
+                        </span>
+                    </div>
+
+                    <div class="phone-comparison">
+                        <div class="phone-block">
+                            <span class="detail-label">CURRENT NUMBER</span>
+                            <strong>{{ request.old_phone or 'Not available' }}</strong>
+                        </div>
+
+                        <div class="phone-arrow" aria-hidden="true">→</div>
+
+                        <div class="phone-block">
+                            <span class="detail-label">NEW NUMBER</span>
+                            <strong>{{ request.new_phone or 'Not available' }}</strong>
+                        </div>
+                    </div>
+
+                    <div class="request-meta">
+                        <div>
+                            <span class="detail-label">AUTHENTICATION</span>
+                            <strong class="meta-value">
+                                {{ request.auth_status|default('UNKNOWN')|replace('_', ' ') }}
+                            </strong>
+                        </div>
+                        <div>
+                            <span class="detail-label">SUBMITTED</span>
+                            <strong class="meta-value">
+                                {{ request.requested_at|default('Date unavailable') }}
+                            </strong>
+                        </div>
+                    </div>
+
+                    <!-- Progress -->
+                    <div class="progress-track" aria-label="Request progress">
+
+                        <div class="progress-item completed">
+                            <span class="progress-marker">✓</span>
+                            <span>Submitted</span>
+                        </div>
+
+                        <span class="progress-connector"></span>
+
+                        <div class="progress-item
+                        {% if request.auth_status == 'VERIFIED' %}
+                            completed
+                        {% elif request.auth_status == 'FAILED' %}
+                            progress-failed
+                        {% else %}
+                            progress-current
+                        {% endif %}">
+                            <span class="progress-marker">
+                                {% if request.auth_status == 'VERIFIED' %}
+                                ✓
+                                {% elif request.auth_status == 'FAILED' %}
+                                !
+                                {% else %}
+                                2
+                                {% endif %}
+                            </span>
+                            <span>Verification</span>
+                        </div>
+
+                        <span class="progress-connector"></span>
+
+                        <div class="progress-item
+                        {% if request.status == 'APPROVED' %}
+                            completed
+                        {% elif request.status == 'REJECTED' %}
+                            progress-failed
+                        {% else %}
+                            progress-current
+                        {% endif %}">
+                            <span class="progress-marker">
+                                {% if request.status == 'APPROVED' %}
+                                ✓
+                                {% elif request.status == 'REJECTED' %}
+                                !
+                                {% else %}
+                                3
+                                {% endif %}
+                            </span>
+                            <span>Decision</span>
+                        </div>
+                    </div>
+
+                    {% if request.status == 'APPROVED' %}
+                    <div class="inline-notice notice-success">
+                        <span>✓</span>
+                        <div>
+                            <strong>Request approved</strong>
+                            <p>Your phone change request has been approved.</p>
+                        </div>
+                    </div>
+                    {% elif request.status == 'REJECTED' %}
+                    <div class="inline-notice notice-danger">
+                        <span>!</span>
+                        <div>
+                            <strong>Request rejected</strong>
+                            <p>
+                                {{ request.rejection_reason or 'Your request was not approved.' }}
+                            </p>
+                        </div>
+                    </div>
+                    {% elif request.auth_status == 'VERIFIED' and request.status == 'PENDING' %}
+                    <div class="inline-notice notice-warning">
+                        <span>✓</span>
+                        <div>
+                            <strong>Parent verified</strong>
+                            <p>Both codes were confirmed. Your mentor will review the request next.</p>
+                        </div>
+                    </div>
+                    {% elif request.auth_status == 'PENDING' %}
+                    <div class="inline-notice notice-warning">
+                        <span>◷</span>
+                        <div>
+                            <strong>Waiting for parent verification</strong>
+                            <p>Your parent must enter the SMS code and the email code. Both are required before your
+                                mentor can review.</p>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Actions: frontend placeholders for delete/notify -->
+                    <div class="request-actions">
+
+                        {% if request.status == 'PENDING' %}
+                        <form method="POST" action="/cancel-phone-change/{{ request.request_id }}"
+                            onsubmit="return confirm('Cancel this phone-change request?');">
+                            <button type="submit" class="button-secondary button-small">Cancel request</button>
+                        </form>
+                        {% else %}
+                        <span class="request-action-hint">
+                            Request ID: {{ request.request_id }}
+                        </span>
+                        {% endif %}
+
+                        <div class="secondary-actions">
+                            <button type="button" class="button-secondary button-small" data-notify
+                                data-request-id="{{ request.request_id }}">
+                                ↗ Notify mentor
+                            </button>
+
+                            <button type="button" class="button-danger button-small" data-delete
+                                data-request-id="{{ request.request_id }}" {% if request.status=='PENDING' or
+                                request.auth_status=='PENDING' %}
+                                title="Pending requests cannot be deleted in this demo" {% endif %}>
+                                × Delete
+                            </button>
+                        </div>
+
+                    </div>
+
+                </article>
+
+                {% endfor %}
+
+            </div>
+
+            {% else %}
+
+            <div class="empty-state">
+                <div class="empty-state-icon">◈</div>
+                <div class="eyebrow">A FRESH START</div>
+                <h3>No requests yet.</h3>
+                <p>
+                    Your phone change requests will appear here with
+                    verification and approval updates.
+                </p>
+                <a href="/request-phone-change" class="button-primary">
+                    Create your first request <span>→</span>
+                </a>
+            </div>
+
+            {% endif %}
+
+        </section>
+
+        <footer class="dashboard-footer">
+            <a href="/student-dashboard" class="footer-brand">EDUSHIELD<span> AI</span></a>
+            <span>Identity protection · Student workspace</span>
+        </footer>
+
+    </main>
+
+    <!-- Demo interactions only. No backend changes occur. -->
+    <div class="toast" id="dashboard-toast" role="status" aria-live="polite"></div>
+
+    <dialog class="confirm-dialog" id="delete-dialog">
+        <div class="dialog-symbol">!</div>
+        <h2>Delete this request?</h2>
+        <p>
+            This is currently a frontend demo. No request will be deleted
+            from the server.
+        </p>
+        <div class="dialog-actions">
+            <button type="button" class="button-secondary" id="cancel-delete">
+                Cancel
+            </button>
+            <button type="button" class="button-danger" id="confirm-delete">
+                Got it
+            </button>
+        </div>
+    </dialog>
+
+    <script>
+        const toast = document.getElementById("dashboard-toast");
+        const deleteDialog = document.getElementById("delete-dialog");
+        let toastTimer;
+
+        function showToast(message) {
+            toast.textContent = message;
+            toast.classList.add("toast-visible");
+
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toast.classList.remove("toast-visible");
+            }, 3500);
+        }
+
+        document.querySelectorAll("[data-notify]").forEach(button => {
+            button.addEventListener("click", () => {
+                const id = button.dataset.requestId;
+                showToast(
+                    `Mentor notification for request #${id} is a UI demo. Backend integration is pending.`
+                );
+            });
+        });
+
+        document.querySelectorAll("[data-delete]").forEach(button => {
+            button.addEventListener("click", () => {
+                const id = button.dataset.requestId;
+                deleteDialog.querySelector("p").textContent =
+                    `Request #${id}: deletion is not connected to the backend yet. No server data will be changed.`;
+                deleteDialog.showModal();
+            });
+        });
+
+        document.getElementById("cancel-delete").addEventListener("click", () => {
+            deleteDialog.close();
+        });
+
+        document.getElementById("confirm-delete").addEventListener("click", () => {
+            deleteDialog.close();
+            showToast(
+                "No request was deleted. We'll connect this button to the backend later."
+            );
+        });
+
+        deleteDialog.addEventListener("click", event => {
+            if (event.target === deleteDialog) {
+                deleteDialog.close();
+            }
+        });
+    </script>
+
+</body>
+
+</html>

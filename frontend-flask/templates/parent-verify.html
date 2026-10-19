@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#08080d">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Parent Verification — EduShield AI</title>
+    <style>
+        :root {
+            --bg: #08080d;
+            --surface: #111118;
+            --border: rgba(255,255,255,.085);
+            --text: #f5f5f7;
+            --secondary: #a5a5b3;
+            --muted: #747482;
+            --accent: #8b5cf6;
+            --accent-light: #c4b5fd;
+            --green: #34d399;
+            --red: #f87171;
+            --amber: #fbbf24;
+            --font: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { -webkit-text-size-adjust: 100%; }
+        body {
+            min-height: 100vh;
+            padding: max(24px, env(safe-area-inset-top, 0px)) 16px max(24px, env(safe-area-inset-bottom, 0px));
+            display: flex; justify-content: center; align-items: flex-start;
+            background: radial-gradient(ellipse at 50% 0%, rgba(139,92,246,.14), transparent 34rem), var(--bg);
+            color: var(--text); font-family: var(--font);
+        }
+        .page { width: 100%; max-width: 520px; }
+        .brand { text-align: center; margin-bottom: 22px; }
+        .brand strong { font-size: 20px; letter-spacing: -.4px; }
+        .brand strong span { color: var(--accent-light); }
+        .brand p { margin-top: 4px; color: var(--muted); font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; }
+        .card {
+            padding: clamp(20px, 5vw, 30px); border: 1px solid var(--border);
+            border-radius: 20px; background: var(--surface); box-shadow: 0 28px 85px rgba(0,0,0,.32);
+        }
+        .badge {
+            display: inline-block; padding: 6px 10px; margin-bottom: 16px; border-radius: 8px;
+            border: 1px solid rgba(139,92,246,.22); background: rgba(139,92,246,.08);
+            color: var(--accent-light); font-size: 11px; font-weight: 700; letter-spacing: .6px;
+        }
+        h1 { font-size: clamp(22px, 5vw, 27px); letter-spacing: -.6px; line-height: 1.25; }
+        .lead { margin-top: 10px; color: var(--secondary); font-size: 14px; line-height: 1.7; }
+        .details { margin-top: 20px; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+        .details div { display: flex; justify-content: space-between; gap: 14px; padding: 13px 15px; font-size: 14px; }
+        .details div + div { border-top: 1px solid var(--border); }
+        .details span:first-child { color: var(--muted); }
+        .details span:last-child { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+
+        .channel {
+            margin-top: 16px; padding: 18px; border: 1px solid var(--border);
+            border-radius: 14px; background: rgba(0,0,0,.14);
+        }
+        .channel-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .channel-title { font-weight: 700; font-size: 15px; }
+        .channel-sub { margin-top: 3px; color: var(--muted); font-size: 12px; }
+        .pill { font-size: 11px; font-weight: 700; padding: 5px 9px; border-radius: 999px; white-space: nowrap; }
+        .pill-pending { background: rgba(251,191,36,.1); color: var(--amber); }
+        .pill-done { background: rgba(52,211,153,.12); color: var(--green); }
+        .pill-locked { background: rgba(248,113,113,.12); color: var(--red); }
+
+        .code-form { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+        .code-input {
+            flex: 1 1 160px; min-height: 48px; padding: 12px 14px; border-radius: 11px;
+            border: 1px solid var(--border); background: #0b0b12; color: var(--text);
+            font: 700 22px var(--font); letter-spacing: 8px; text-align: center;
+        }
+        .code-input:focus { outline: 2px solid var(--accent-light); outline-offset: 2px; }
+        .btn {
+            min-height: 48px; padding: 12px 18px; border-radius: 11px; border: 1px solid transparent;
+            font: 700 14px var(--font); cursor: pointer; color: #fff;
+            background: linear-gradient(110deg, var(--accent), #6d28d9);
+        }
+        .btn:disabled { opacity: .5; cursor: not-allowed; }
+        .hint { margin-top: 10px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+        .msg { display: none; margin-top: 12px; padding: 11px 13px; border-radius: 10px; font-size: 13px; line-height: 1.6; }
+        .msg.error { display: block; background: rgba(248,113,113,.07); border: 1px solid rgba(248,113,113,.22); color: #fca5a5; }
+        .msg.ok { display: block; background: rgba(52,211,153,.07); border: 1px solid rgba(52,211,153,.22); color: #6ee7b7; }
+
+        .done-box {
+            margin-top: 18px; padding: 16px; border-radius: 14px; text-align: center;
+            background: rgba(52,211,153,.07); border: 1px solid rgba(52,211,153,.22); color: #6ee7b7;
+            font-weight: 700; display: none;
+        }
+        .done-box p { margin-top: 6px; font-weight: 400; color: var(--secondary); font-size: 13px; line-height: 1.6; }
+
+        .resend { margin-top: 18px; text-align: center; }
+        .btn-secondary {
+            min-height: 44px; padding: 11px 18px; border-radius: 11px; cursor: pointer;
+            border: 1px solid var(--border); background: rgba(139,92,246,.08);
+            color: var(--accent-light); font: 700 13px var(--font);
+        }
+        .btn-secondary:disabled { opacity: .5; cursor: not-allowed; }
+
+        .report { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
+        .report p { color: var(--secondary); font-size: 13px; line-height: 1.6; }
+        .btn-danger {
+            margin-top: 12px; width: 100%; min-height: 48px; border-radius: 11px; cursor: pointer;
+            border: 1px solid rgba(248,113,113,.3); background: rgba(248,113,113,.07);
+            color: #fca5a5; font: 700 14px var(--font);
+        }
+        .btn-danger:disabled { opacity: .5; cursor: not-allowed; }
+
+        .notice { padding: 20px; border-radius: 14px; border: 1px solid var(--border); background: rgba(0,0,0,.14); }
+        .notice h1 { font-size: 22px; }
+        .notice p { margin-top: 10px; color: var(--secondary); font-size: 14px; line-height: 1.7; }
+
+        .footer { margin-top: 18px; text-align: center; color: var(--muted); font-size: 11px; }
+
+        @media (max-width: 480px) {
+            .code-form { flex-direction: column; }
+            .btn { width: 100%; }
+        }
+        @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+    </style>
+</head>
+<body>
+<main class="page">
+    <header class="brand">
+        <strong>EduShield<span> AI</span></strong>
+        <p>Secure parent verification</p>
+    </header>
+
+    <section class="card">
+
+    {% if state == 'invalid' %}
+        <div class="notice">
+            <h1>Link not found</h1>
+            <p>This verification link is invalid or has already been replaced. If you believe this is a mistake, contact the school directly.</p>
+        </div>
+
+    {% elif state == 'expired' %}
+        <div class="notice">
+            <h1>This link has expired</h1>
+            <p>Verification links are valid for a limited time. Ask the student to submit a new phone-change request, and check the new email.</p>
+        </div>
+
+    {% elif state == 'held' %}
+        <div class="notice">
+            <h1>Reported and on hold</h1>
+            <p>Thank you. This request has been placed on security hold and the mentor has been alerted. No further action is needed from you.</p>
+        </div>
+
+    {% elif state == 'closed' %}
+        <div class="notice">
+            <h1>This request is closed</h1>
+            <p>This phone-change request is no longer open for parent verification.</p>
+        </div>
+
+    {% elif state == 'error' %}
+        <div class="notice">
+            <h1>Something went wrong</h1>
+            <p>We could not load this page. Please try the link again in a moment.</p>
+        </div>
+
+    {% else %}
+        <span class="badge">PARENT VERIFICATION REQUIRED</span>
+        <h1>Confirm a phone-number change</h1>
+        <p class="lead">
+            A phone-number change was requested for the account of <strong>{{ student_name }}</strong>.
+            Enter the code sent to each of your two contacts. Both codes are required.
+        </p>
+
+        <div class="details">
+            <div><span>Student</span><span>{{ student_name }}</span></div>
+            <div><span>New number</span><span>{{ new_phone_masked }}</span></div>
+            <div><span>Request ID</span><span>{{ request_id }}</span></div>
+        </div>
+
+        {% for otp in otps %}
+        <div class="channel" data-channel="{{ otp.channel }}">
+            <div class="channel-head">
+                <div>
+                    <div class="channel-title">{{ 'SMS code' if otp.channel == 'SMS' else 'Email code' }}</div>
+                    <div class="channel-sub">
+                        {{ 'Sent to your registered mobile number' if otp.channel == 'SMS' else 'Sent to ' ~ parent_email_masked }}
+                    </div>
+                </div>
+                {% if otp.verified %}
+                    <span class="pill pill-done" data-status>✓ Verified</span>
+                {% elif otp.locked %}
+                    <span class="pill pill-locked" data-status>Locked</span>
+                {% else %}
+                    <span class="pill pill-pending" data-status>Pending</span>
+                {% endif %}
+            </div>
+
+            {% if not otp.verified and not otp.locked %}
+            <form class="code-form" data-form="{{ otp.channel }}" autocomplete="off">
+                <input class="code-input" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+                       name="code" placeholder="000000" aria-label="{{ otp.channel }} verification code" required
+                       {% if not otp.is_valid %}disabled{% endif %}>
+                <button class="btn" type="submit" {% if not otp.is_valid %}disabled{% endif %}>Verify</button>
+            </form>
+            <div class="hint" data-hint>
+                {% if otp.is_valid %}
+                    Attempts left: <span data-attempts>{{ otp.attempts_left }}</span>. The code expires in 5 minutes and can be used once.
+                {% else %}
+                    This code has expired. Ask the student to submit a new request.
+                {% endif %}
+            </div>
+            {% endif %}
+            <div class="msg" data-msg role="alert"></div>
+        </div>
+        {% endfor %}
+
+        <div class="done-box" id="doneBox">
+            ✓ Both codes verified
+            <p>Thank you. The request now goes to the school mentor for review. You will be notified of the outcome.</p>
+        </div>
+
+        <div class="resend">
+            <button class="btn-secondary" id="resendBtn" type="button">Resend codes</button>
+            <div class="msg" id="resendMsg" role="alert"></div>
+        </div>
+
+        <div class="report">
+            <p>
+                Did <strong>not</strong> request this change? Do not enter the codes.
+                Report it and the request will be stopped.
+            </p>
+            <button class="btn-danger" id="reportBtn" type="button">This wasn't me</button>
+            <div class="msg" id="reportMsg" role="alert"></div>
+        </div>
+    {% endif %}
+
+    </section>
+
+    <footer class="footer">EduShield AI · Secure identity protection</footer>
+</main>
+
+{% if state == 'open' %}
+<script>
+(function () {
+    const token = {{ token|tojson }};
+    const base = "/parent/verify/" + encodeURIComponent(token);
+
+    function showMsg(el, text, kind) {
+        el.textContent = text;
+        el.className = "msg " + kind;
+    }
+
+    function refreshDoneState() {
+        const pills = document.querySelectorAll("[data-channel]");
+        const allVerified = Array.from(pills).every(
+            (c) => c.querySelector("[data-status]").textContent.includes("Verified")
+        );
+        if (allVerified) {
+            document.getElementById("doneBox").style.display = "block";
+            document.getElementById("reportBtn").disabled = true;
+        }
+    }
+
+    document.querySelectorAll("form[data-form]").forEach((form) => {
+        const channel = form.dataset.form.toLowerCase();
+        const card = form.closest("[data-channel]");
+        const input = form.querySelector("input[name=code]");
+        const button = form.querySelector("button");
+        const msg = card.querySelector("[data-msg]");
+
+        input.addEventListener("input", () => {
+            input.value = input.value.replace(/\D/g, "").slice(0, 6);
+        });
+
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            if (!/^\d{6}$/.test(input.value)) {
+                showMsg(msg, "Enter the 6-digit code.", "error");
+                return;
+            }
+
+            button.disabled = true;
+            try {
+                const response = await fetch(`${base}/${channel}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ code: input.value })
+                });
+                let data = {};
+                try { data = await response.json(); } catch (_) {}
+
+                if (response.ok && data.success) {
+                    card.querySelector("[data-status]").className = "pill pill-done";
+                    card.querySelector("[data-status]").textContent = "✓ Verified";
+                    form.remove();
+                    const hint = card.querySelector("[data-hint]");
+                    if (hint) hint.remove();
+                    showMsg(msg, "Code verified.", "ok");
+    const resend = document.getElementById("resendBtn");
+    if (resend) {
+        resend.addEventListener("click", async () => {
+            resend.disabled = true;
+            const msg = document.getElementById("resendMsg");
+            try {
+                const response = await fetch("/parent/resend/" + encodeURIComponent(token), {
+                    method: "POST"
+                });
+                let data = {};
+                try { data = await response.json(); } catch (_) {}
+                if (response.ok && data.success) {
+                    showMsg(msg, "New codes sent. Check your email and mobile messages.", "ok");
+                } else {
+                    showMsg(msg, data.message || "Could not resend codes.", "error");
+                }
+            } catch (_) {
+                showMsg(msg, "Network error. Please try again.", "error");
+            } finally {
+                resend.disabled = false;
+            }
+        });
+    }
+
+    refreshDoneState();
+                    return;
+                }
+
+                if (data.locked || response.status === 423) {
+                    card.querySelector("[data-status]").className = "pill pill-locked";
+                    card.querySelector("[data-status]").textContent = "Locked";
+                    form.remove();
+                    const hint = card.querySelector("[data-hint]");
+                    if (hint) hint.remove();
+                }
+                showMsg(msg, data.message || "Verification failed.", "error");
+                if (typeof data.attempts_left === "number") {
+                    const counter = card.querySelector("[data-attempts]");
+                    if (counter) counter.textContent = data.attempts_left;
+                }
+            } catch (_) {
+                showMsg(msg, "Network error. Please try again.", "error");
+            } finally {
+                if (form.isConnected) button.disabled = false;
+                input.value = "";
+            }
+        });
+    });
+
+    const report = document.getElementById("reportBtn");
+    if (report) {
+        report.addEventListener("click", async () => {
+            if (!window.confirm("Stop this request? It will be placed on security hold and your mentor will be alerted.")) {
+                return;
+            }
+            report.disabled = true;
+            const msg = document.getElementById("reportMsg");
+            try {
+                const response = await fetch("/parent/report/" + encodeURIComponent(token), {
+                    method: "POST"
+                });
+                let data = {};
+                try { data = await response.json(); } catch (_) {}
+                if (response.ok && data.success) {
+                    document.querySelectorAll("form[data-form]").forEach((f) => f.remove());
+                    showMsg(msg, data.message, "ok");
+                } else {
+                    report.disabled = false;
+                    showMsg(msg, data.message || "Could not record your report.", "error");
+                }
+            } catch (_) {
+                report.disabled = false;
+                showMsg(msg, "Network error. Please try again.", "error");
+            }
+        });
+    }
+
+    refreshDoneState();
+})();
+</script>
+{% endif %}
+</body>
+</html>
