@@ -4,7 +4,7 @@ gunicorn
 mysql-connector-python
 PyJWT
 python-dotenv
-scikit-learn
+scikit-learn==1.9.0
 numpy
 pandas
 joblib

@@ -1,6 +1,9 @@
 """
 End-to-end tests for the dual-OTP phone-change flow.
 
+These run against a real MySQL database (edushield_test). See
+tests/dbtest.py for the safety guard and fixture helpers.
+
 Run from backend/:
     python -m unittest discover -s tests -v
 """
@@ -8,6 +11,8 @@ Run from backend/:
 import os
 import re
 import sys
+import threading
+import time
 import unittest
 from unittest import mock
 
@@ -19,11 +24,21 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 os.environ["JWT_SECRET"] = "test-jwt-secret"
 os.environ["EDUSHIELD_OTP_PEPPER"] = "test-pepper-value"
 os.environ["EDUSHIELD_SMS_PROVIDER"] = "disabled"
+os.environ["EDUSHIELD_ENV"] = "test"
+os.environ["OTP_DELIVERY_MODE"] = "demo"
 
 import otp  # noqa: E402
 import app as backend  # noqa: E402
-from auth import generate_token  # noqa: E402
-from fake_db import FakeState, FakeConnection  # noqa: E402
+from auth import generate_token, hash_password  # noqa: E402
+from dbtest import (  # noqa: E402
+    RealDatabaseTestCase,
+    add_assignment,
+    add_user,
+    connect,
+    fresh_fetch_all,
+    fresh_fetch_one,
+    shift_time,
+)
 
 
 STUDENT = "S1024"
@@ -31,38 +46,49 @@ MENTOR = "M021"
 NEW_PHONE = "9555666777"
 
 
-class FlowTestBase(unittest.TestCase):
+class FlowTestBase(RealDatabaseTestCase):
 
-    def setUp(self):
-        self.state = FakeState()
+    # Fixtures are seeded via seed(); disable the default hook body.
+    seed_default_fixtures = True
 
+    def seed(self):
+        add_user(
+            self.connection,
+            user_id=STUDENT, name="Rahul", email="rahul@student.test",
+            parent_email="parent@example.test", parent_phone="+919876504821",
+            phone_number="9000000001", role="student", password_hash="x",
+        )
+        add_user(
+            self.connection,
+            user_id=MENTOR, name="Dr. Harsha", email="harsha@mentor.test",
+            phone_number="9000000002", role="mentor", password_hash="x",
+        )
+
+        # Mentor authorisation now comes from the assignment table.
+        add_assignment(self.connection, STUDENT, MENTOR)
+
+    def after_setup(self):
         # Rate-limit state is process-wide; clear it so tests do not
         # bleed into one another (they reuse the same user IDs).
         backend.limiter.reset()
-        self.state.add_user(
-            user_id=STUDENT, name="Rahul", email="rahul@student.test",
-            parent_email="parent@example.test", parent_phone="+919876504821",
-            phone_number="9000000001", mentor_id=MENTOR, role="student",
-            password_hash="x",
-        )
-        self.state.add_user(
-            user_id=MENTOR, name="Dr. Harsha", email="harsha@mentor.test",
-            parent_email=None, parent_phone=None, phone_number=None,
-            mentor_id=None, role="mentor", password_hash="x",
-        )
 
         self.sent_sms = []
         self.sent_email = []
 
         patches = [
-            mock.patch.object(backend, "get_db",
-                              side_effect=lambda: FakeConnection(self.state)),
-            mock.patch.object(backend, "send_sms",
-                              side_effect=self._capture_sms),
-            mock.patch.object(backend, "send_email",
-                              side_effect=self._capture_email),
-            mock.patch.object(backend, "get_client_location",
-                              return_value=(12.97, 77.59)),
+            mock.patch.object(
+                backend, "get_db",
+                side_effect=lambda: connect(self.db_config),
+            ),
+            mock.patch.object(
+                backend, "send_sms", side_effect=self._capture_sms,
+            ),
+            mock.patch.object(
+                backend, "send_email", side_effect=self._capture_email,
+            ),
+            mock.patch.object(
+                backend, "get_client_location", return_value=(12.97, 77.59),
+            ),
         ]
         for p in patches:
             p.start()
@@ -79,27 +105,61 @@ class FlowTestBase(unittest.TestCase):
         }
 
     # Capture outbound messages instead of sending them.
-    def _capture_sms(self, to, text):
+    def _capture_sms(self, to, text, **kwargs):
         self.sent_sms.append((to, text))
 
-    def _capture_email(self, to, subject, body):
+    def _capture_email(self, to, subject, body, html=None, **kwargs):
         self.sent_email.append((to, subject, body))
+
+    # --- DB readers (replaces the old in-memory state) -------------
+    def otps(self):
+        return fresh_fetch_all(
+            self.db_config,
+            "SELECT * FROM phone_change_otps ORDER BY otp_id",
+        )
+
+    def requests(self):
+        return fresh_fetch_all(
+            self.db_config,
+            "SELECT * FROM phone_change_requests ORDER BY request_id",
+        )
+
+    def user(self, user_id):
+        return fresh_fetch_one(
+            self.db_config,
+            "SELECT * FROM users WHERE user_id = %s",
+            (user_id,),
+        )
+
+    def ai_rows(self):
+        return fresh_fetch_all(
+            self.db_config, "SELECT * FROM ai_assessments"
+        )
+
+    def audit_actions(self):
+        return [
+            r["action"]
+            for r in fresh_fetch_all(
+                self.db_config, "SELECT action FROM audit_logs"
+            )
+        ]
 
     # --- helpers --------------------------------------------------
     def submit_request(self, new_phone=NEW_PHONE):
-        resp = self.client.post(
+        return self.client.post(
             "/api/phone-change-requests",
             json={"new_phone": new_phone},
             headers=self.student_auth,
         )
-        return resp
 
     def sms_code(self):
         text = self.sent_sms[-1][1]
         return re.search(r"code is (\d{6})", text).group(1)
 
     def _parent_email_body(self):
-        bodies = [b for to, _, b in self.sent_email if to == "parent@example.test"]
+        bodies = [
+            b for to, _, b in self.sent_email if to == "parent@example.test"
+        ]
         return bodies[-1]
 
     def email_code(self):
@@ -117,10 +177,17 @@ class FlowTestBase(unittest.TestCase):
         )
 
     def request_id(self):
-        return next(iter(self.state.requests))
+        return self.requests()[0]["request_id"]
 
     def auth_status(self):
-        return self.state.requests[self.request_id()]["auth_status"]
+        return self.request_id_row()["auth_status"]
+
+    def request_id_row(self):
+        return fresh_fetch_one(
+            self.db_config,
+            "SELECT * FROM phone_change_requests WHERE request_id = %s",
+            (self.request_id(),),
+        )
 
     def approve(self):
         return self.client.patch(
@@ -136,7 +203,7 @@ class SubmissionTests(FlowTestBase):
         resp = self.submit_request()
         self.assertEqual(resp.status_code, 201)
 
-        otps = self.state.otps
+        otps = self.otps()
         self.assertEqual(len(otps), 2)
         self.assertEqual({o["channel"] for o in otps}, {"SMS", "EMAIL"})
         self.assertNotEqual(otps[0]["code_hash"], otps[1]["code_hash"])
@@ -150,7 +217,7 @@ class SubmissionTests(FlowTestBase):
         self.assertNotIn(sms, resp.get_data(as_text=True))
         self.assertNotIn(email, resp.get_data(as_text=True))
 
-        stored = " ".join(str(o["code_hash"]) for o in self.state.otps)
+        stored = " ".join(str(o["code_hash"]) for o in self.otps())
         self.assertNotIn(sms, stored)
         self.assertNotIn(email, stored)
 
@@ -159,7 +226,8 @@ class SubmissionTests(FlowTestBase):
         self.assertEqual(resp.get_json()["parent_delivery"],
                          {"sms": True, "email": True})
         self.assertEqual(self.sent_sms[-1][0], "+919876504821")
-        self.assertIn("parent@example.test", [to for to, _, _ in self.sent_email])
+        self.assertIn("parent@example.test",
+                      [to for to, _, _ in self.sent_email])
 
     def test_mentor_is_notified_of_new_request(self):
         self.submit_request()
@@ -173,7 +241,7 @@ class SubmissionTests(FlowTestBase):
 
     def test_no_ai_assessment_before_parent_verification(self):
         self.submit_request()
-        self.assertEqual(self.state.ai, {})
+        self.assertEqual(self.ai_rows(), [])
 
 
 class MentorGateTests(FlowTestBase):
@@ -182,7 +250,7 @@ class MentorGateTests(FlowTestBase):
         self.submit_request()
         resp = self.approve()
         self.assertEqual(resp.status_code, 403)
-        self.assertEqual(self.state.users[STUDENT]["phone_number"], "9000000001")
+        self.assertEqual(self.user(STUDENT)["phone_number"], "9000000001")
 
     def test_mentor_cannot_approve_with_only_sms_verified(self):
         self.submit_request()
@@ -216,8 +284,15 @@ class DualOtpTests(FlowTestBase):
         self.assertEqual(r2.get_json()["auth_status"], "VERIFIED")
 
         self.assertEqual(self.auth_status(), "VERIFIED")
-        self.assertIn(self.request_id(), self.state.ai)
-        actions = [a["action"] for a in self.state.audit]
+        self.assertEqual(
+            len(fresh_fetch_all(
+                self.db_config,
+                "SELECT * FROM ai_assessments WHERE request_id = %s",
+                (self.request_id(),),
+            )),
+            1,
+        )
+        actions = self.audit_actions()
         self.assertIn("PARENT_AUTHENTICATION_COMPLETED", actions)
         self.assertIn("AI_ASSESSMENT_GENERATED", actions)
 
@@ -240,7 +315,7 @@ class DualOtpTests(FlowTestBase):
 
         resp = self.approve()
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(self.state.users[STUDENT]["phone_number"], NEW_PHONE)
+        self.assertEqual(self.user(STUDENT)["phone_number"], NEW_PHONE)
 
     def test_codes_are_one_time_use(self):
         self.submit_request()
@@ -269,7 +344,7 @@ class DualOtpTests(FlowTestBase):
         r3 = self.verify(token, "sms", wrong)
         self.assertEqual(r3.status_code, 423)
 
-        sms_row = next(o for o in self.state.otps if o["channel"] == "SMS")
+        sms_row = next(o for o in self.otps() if o["channel"] == "SMS")
         self.assertEqual(sms_row["locked"], 1)
 
         # Even the correct code is refused once locked.
@@ -282,7 +357,7 @@ class DualOtpTests(FlowTestBase):
         token = self.parent_token()
         code = self.sms_code()
 
-        self.state.now += 6  # OTP TTL is 5 minutes
+        shift_time(self.connection, 6 * 60)  # OTP TTL is 5 minutes
         resp = self.verify(token, "sms", code)
         self.assertEqual(resp.status_code, 410)
 
@@ -291,7 +366,7 @@ class DualOtpTests(FlowTestBase):
         token = self.parent_token()
         resp = self.verify(token, "sms", "12ab")
         self.assertEqual(resp.status_code, 400)
-        sms_row = next(o for o in self.state.otps if o["channel"] == "SMS")
+        sms_row = next(o for o in self.otps() if o["channel"] == "SMS")
         self.assertEqual(sms_row["attempts"], 0)
 
     def test_unknown_token_is_rejected(self):
@@ -302,7 +377,7 @@ class DualOtpTests(FlowTestBase):
     def test_expired_link_is_rejected(self):
         self.submit_request()
         token = self.parent_token()
-        self.state.now += 16  # link TTL is 15 minutes
+        shift_time(self.connection, 16 * 60)  # link TTL is 15 minutes
         resp = self.verify(token, "sms", self.sms_code())
         self.assertEqual(resp.status_code, 410)
 
@@ -310,11 +385,18 @@ class DualOtpTests(FlowTestBase):
 class InvalidParentContactTests(FlowTestBase):
 
     def test_invalid_parent_phone_is_refused_before_anything_is_created(self):
-        self.state.users[STUDENT]["parent_phone"] = "not-a-number"
+        cursor = self.connection.cursor()
+        cursor.execute(
+            "UPDATE users SET parent_phone = %s WHERE user_id = %s",
+            ("not-a-number", STUDENT),
+        )
+        self.connection.commit()
+        cursor.close()
+
         resp = self.submit_request()
         self.assertEqual(resp.status_code, 400)
-        self.assertEqual(self.state.requests, {})
-        self.assertEqual(self.state.otps, [])
+        self.assertEqual(self.requests(), [])
+        self.assertEqual(self.otps(), [])
 
 
 class SecurityHoldAndCancelTests(FlowTestBase):
@@ -325,9 +407,7 @@ class SecurityHoldAndCancelTests(FlowTestBase):
 
         resp = self.client.post(f"/parent/report/{token}")
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(
-            self.state.requests[self.request_id()]["status"], "SECURITY_HOLD"
-        )
+        self.assertEqual(self.request_id_row()["status"], "SECURITY_HOLD")
 
         # Codes can no longer be used after the report.
         self.assertEqual(
@@ -347,7 +427,72 @@ class SecurityHoldAndCancelTests(FlowTestBase):
             headers=self.mentor_auth,
         )
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(self.state.users[STUDENT]["phone_number"], "9000000001")
+        self.assertEqual(self.user(STUDENT)["phone_number"], "9000000001")
+
+    def test_hold_committed_while_approval_waits_blocks_the_approval(self):
+        """
+        MySQL row-lock regression test.
+
+        A decision that is already holding the request row commits a
+        SECURITY_HOLD. A concurrent approval must wait for that lock and
+        then observe the hold, so it cannot approve the request.
+        """
+
+        self.submit_request()
+        request_id = self.request_id()
+        blocker = connect(self.db_config)
+        cursor = blocker.cursor()
+        outcome = {}
+
+        try:
+            blocker.start_transaction()
+            cursor.execute(
+                "SELECT request_id FROM phone_change_requests "
+                "WHERE request_id = %s FOR UPDATE",
+                (request_id,),
+            )
+            self.assertIsNotNone(cursor.fetchone())
+
+            def approve_in_thread():
+                client = backend.app.test_client()
+                outcome["response"] = client.patch(
+                    f"/api/phone-change-requests/{request_id}",
+                    json={"decision": "APPROVED"},
+                    headers=self.mentor_auth,
+                )
+
+            worker = threading.Thread(target=approve_in_thread)
+            worker.start()
+            time.sleep(0.5)
+
+            self.assertTrue(
+                worker.is_alive(),
+                "approval did not wait for the request row lock",
+            )
+
+            cursor.execute(
+                "UPDATE phone_change_requests "
+                "SET status = 'SECURITY_HOLD' "
+                "WHERE request_id = %s AND status = 'PENDING'",
+                (request_id,),
+            )
+            self.assertEqual(cursor.rowcount, 1)
+            blocker.commit()
+
+            worker.join(timeout=15)
+            self.assertFalse(worker.is_alive(), "approval did not finish")
+        finally:
+            try:
+                blocker.rollback()
+            except Exception:
+                pass
+            cursor.close()
+            blocker.close()
+
+        self.assertEqual(outcome["response"].status_code, 403)
+        row = self.request_id_row()
+        self.assertEqual(row["status"], "SECURITY_HOLD")
+        self.assertEqual(self.user(STUDENT)["phone_number"], "9000000001")
 
     def test_student_can_cancel_and_codes_stop_working(self):
         self.submit_request()
@@ -359,9 +504,7 @@ class SecurityHoldAndCancelTests(FlowTestBase):
             headers=self.student_auth,
         )
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(
-            self.state.requests[self.request_id()]["status"], "CANCELLED"
-        )
+        self.assertEqual(self.request_id_row()["status"], "CANCELLED")
         self.assertEqual(self.verify(token, "sms", code).status_code, 409)
 
     def test_mentor_cannot_cancel_a_students_request(self):
@@ -388,7 +531,7 @@ class ParentPageTests(FlowTestBase):
         self.assertIn('data-channel="EMAIL"', html)
         self.assertNotIn(sms, html)
         self.assertNotIn(email, html)
-        self.assertNotIn(self.state.requests[self.request_id()]["old_phone"], html)
+        self.assertNotIn(self.request_id_row()["old_phone"], html)
 
     def test_parent_page_shows_invalid_for_unknown_token(self):
         resp = self.client.get("/parent/verify/does-not-exist")
@@ -415,7 +558,7 @@ class ResendTests(FlowTestBase):
         token = self.parent_token()
         old_code = self.sms_code()
 
-        self.state.now += 6  # original code has expired
+        shift_time(self.connection, 6 * 60)  # original code has expired
 
         resp = self.resend(token)
         self.assertEqual(resp.status_code, 200)
@@ -440,7 +583,7 @@ class ResendTests(FlowTestBase):
         self.submit_request()
         token = self.parent_token()
 
-        self.state.now += 16  # parent link TTL is 15 minutes
+        shift_time(self.connection, 16 * 60)  # parent link TTL is 15 minutes
         resp = self.resend(token)
         self.assertEqual(resp.status_code, 410)
 
@@ -453,8 +596,49 @@ class ResendTests(FlowTestBase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.get_json()["resent"], ["EMAIL"])
 
-        sms_row = next(o for o in self.state.otps if o["channel"] == "SMS")
+        sms_row = next(o for o in self.otps() if o["channel"] == "SMS")
         self.assertEqual(sms_row["verified"], 1)
+
+
+class SecurityHardeningTests(FlowTestBase):
+
+    def test_login_is_rate_limited_per_account(self):
+        cursor = self.connection.cursor()
+        cursor.execute(
+            "UPDATE users SET password_hash = %s WHERE user_id = %s",
+            (hash_password("right"), STUDENT),
+        )
+        self.connection.commit()
+        cursor.close()
+
+        for _ in range(10):
+            resp = self.client.post(
+                "/api/auth/login",
+                json={"email": "rahul@student.test", "password": "wrong"},
+            )
+            self.assertEqual(resp.status_code, 401)
+
+        resp = self.client.post(
+            "/api/auth/login",
+            json={"email": "rahul@student.test", "password": "wrong"},
+        )
+        self.assertEqual(resp.status_code, 429)
+
+    def test_db_test_requires_authentication(self):
+        resp = self.client.get("/api/db-test")
+        self.assertEqual(resp.status_code, 401)
+
+    def test_db_test_is_hidden_in_production(self):
+        with mock.patch.dict(os.environ, {"EDUSHIELD_ENV": "production"}):
+            resp = self.client.get("/api/db-test", headers=self.student_auth)
+        self.assertEqual(resp.status_code, 404)
+
+    def test_logout_revokes_token(self):
+        resp = self.client.post("/api/auth/logout", headers=self.student_auth)
+        self.assertEqual(resp.status_code, 200)
+
+        me = self.client.get("/api/auth/me", headers=self.student_auth)
+        self.assertEqual(me.status_code, 401)
 
 
 class SecretHandlingTests(unittest.TestCase):

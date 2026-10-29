@@ -305,15 +305,15 @@
                         {% endif %}
 
                         <div class="secondary-actions">
+                            {% if request.status == 'PENDING' %}
                             <button type="button" class="button-secondary button-small" data-notify
                                 data-request-id="{{ request.request_id }}">
                                 ↗ Notify mentor
                             </button>
+                            {% endif %}
 
                             <button type="button" class="button-danger button-small" data-delete
-                                data-request-id="{{ request.request_id }}" {% if request.status=='PENDING' or
-                                request.auth_status=='PENDING' %}
-                                title="Pending requests cannot be deleted in this demo" {% endif %}>
+                                data-request-id="{{ request.request_id }}">
                                 × Delete
                             </button>
                         </div>
@@ -352,22 +352,22 @@
 
     </main>
 
-    <!-- Demo interactions only. No backend changes occur. -->
+    <!-- Real interactions: delete hides the request, notify pings the mentor. -->
     <div class="toast" id="dashboard-toast" role="status" aria-live="polite"></div>
 
     <dialog class="confirm-dialog" id="delete-dialog">
         <div class="dialog-symbol">!</div>
         <h2>Delete this request?</h2>
         <p>
-            This is currently a frontend demo. No request will be deleted
-            from the server.
+            This removes the request from your list. Your mentor and the
+            security team still keep the record for auditing.
         </p>
         <div class="dialog-actions">
             <button type="button" class="button-secondary" id="cancel-delete">
                 Cancel
             </button>
             <button type="button" class="button-danger" id="confirm-delete">
-                Got it
+                Delete
             </button>
         </div>
     </dialog>
@@ -387,33 +387,73 @@
             }, 3500);
         }
 
+        function postForm(url) {
+            const form = document.createElement("form");
+            form.method = "POST";
+            form.action = url;
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        // --- Notify mentor -------------------------------------------
         document.querySelectorAll("[data-notify]").forEach(button => {
-            button.addEventListener("click", () => {
+            button.addEventListener("click", async () => {
                 const id = button.dataset.requestId;
-                showToast(
-                    `Mentor notification for request #${id} is a UI demo. Backend integration is pending.`
-                );
+                button.disabled = true;
+
+                try {
+                    const response = await fetch(
+                        `/notify-mentor/${id}`,
+                        { method: "POST", headers: { "Accept": "application/json" } }
+                    );
+                    const data = await response.json().catch(() => ({}));
+
+                    if (response.ok && data.success) {
+                        button.textContent = "✓ Mentor notified";
+                        showToast(data.message || "Your mentor has been notified.");
+                        return;
+                    }
+
+                    if (response.status === 429) {
+                        button.textContent = "✓ Mentor notified";
+                        showToast(data.message || "Your mentor was notified recently.");
+                        return;
+                    }
+
+                    button.disabled = false;
+                    showToast(data.message || "Could not notify your mentor.");
+                } catch (error) {
+                    button.disabled = false;
+                    showToast("Network error. Please try again.");
+                }
             });
         });
 
+        // --- Delete request ------------------------------------------
+        let pendingDeleteId = null;
+
         document.querySelectorAll("[data-delete]").forEach(button => {
             button.addEventListener("click", () => {
-                const id = button.dataset.requestId;
+                pendingDeleteId = button.dataset.requestId;
                 deleteDialog.querySelector("p").textContent =
-                    `Request #${id}: deletion is not connected to the backend yet. No server data will be changed.`;
+                    `Request #${pendingDeleteId} will be removed from your list. ` +
+                    "Your mentor and the security team still keep the record for auditing.";
                 deleteDialog.showModal();
             });
         });
 
         document.getElementById("cancel-delete").addEventListener("click", () => {
+            pendingDeleteId = null;
             deleteDialog.close();
         });
 
         document.getElementById("confirm-delete").addEventListener("click", () => {
+            const id = pendingDeleteId;
             deleteDialog.close();
-            showToast(
-                "No request was deleted. We'll connect this button to the backend later."
-            );
+
+            if (id) {
+                postForm(`/delete-phone-change/${id}`);
+            }
         });
 
         deleteDialog.addEventListener("click", event => {

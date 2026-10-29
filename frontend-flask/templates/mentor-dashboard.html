@@ -22,6 +22,12 @@
         </a>
 
         <div class="mentor-profile">
+            <button type="button" class="notif-bell" id="notif-bell"
+                aria-haspopup="true" aria-expanded="false" aria-label="Notifications"
+                title="Notifications">
+                <span class="notif-bell-icon" aria-hidden="true">🔔</span>
+                <span class="notif-badge" id="notif-badge" hidden>0</span>
+            </button>
             <div class="mentor-avatar">M</div>
             <div class="mentor-profile-info">
                 <span>MENTOR ACCOUNT</span>
@@ -31,6 +37,16 @@
             <a href="/logout" class="logout-link">Log out <span>↗</span></a>
         </div>
     </header>
+
+    <div class="notif-panel" id="notif-panel" hidden>
+        <div class="notif-panel-head">
+            <strong>Notifications</strong>
+            <button type="button" class="notif-close" id="notif-close" aria-label="Close">×</button>
+        </div>
+        <div class="notif-list" id="notif-list">
+            <p class="notif-empty">No notifications yet.</p>
+        </div>
+    </div>
 
     <main class="mentor-container">
 
@@ -320,5 +336,119 @@
 
     </main>
 </div>
+
+<script>
+(function () {
+    const bell = document.getElementById("notif-bell");
+    const badge = document.getElementById("notif-badge");
+    const panel = document.getElementById("notif-panel");
+    const list = document.getElementById("notif-list");
+    const closeBtn = document.getElementById("notif-close");
+
+    // Light-touch escaping: everything shown from the API is treated as
+    // text, never markup.
+    function escapeHtml(value) {
+        const div = document.createElement("div");
+        div.textContent = value == null ? "" : String(value);
+        return div.innerHTML;
+    }
+
+    function render(items) {
+        if (!items.length) {
+            list.innerHTML = '<p class="notif-empty">No notifications yet.</p>';
+            return;
+        }
+
+        list.innerHTML = "";
+
+        items.forEach(function (item) {
+            const row = document.createElement("button");
+            row.type = "button";
+            row.className = "notif-item" + (item.read ? " notif-read" : " notif-unread");
+            row.dataset.id = item.notification_id;
+
+            const when = item.created_at
+                ? new Date(item.created_at).toLocaleString()
+                : "";
+
+            row.innerHTML =
+                '<span class="notif-dot"></span>' +
+                '<span class="notif-body">' +
+                '<span class="notif-message">' + escapeHtml(item.message) + '</span>' +
+                '<span class="notif-meta">' + escapeHtml(item.type) +
+                (item.request_id ? ' · ' + escapeHtml(item.request_id) : '') +
+                (when ? ' · ' + escapeHtml(when) : '') +
+                '</span></span>';
+
+            row.addEventListener("click", function () {
+                markRead(item.notification_id, row);
+            });
+
+            list.appendChild(row);
+        });
+    }
+
+    function updateBadge(unread) {
+        if (unread > 0) {
+            badge.textContent = unread > 99 ? "99+" : String(unread);
+            badge.hidden = false;
+        } else {
+            badge.hidden = true;
+        }
+    }
+
+    function load() {
+        fetch("/notifications", { headers: { "Accept": "application/json" } })
+            .then(function (r) { return r.json().catch(function () { return {}; }); })
+            .then(function (data) {
+                const items = data.notifications || [];
+                updateBadge(data.unread || 0);
+                render(items);
+            })
+            .catch(function () { /* leave the badge as-is on failure */ });
+    }
+
+    function markRead(id, row) {
+        fetch("/notifications/" + id + "/read", {
+            method: "POST",
+            headers: { "Accept": "application/json" }
+        })
+            .then(function (r) { return r.json().catch(function () { return {}; }); })
+            .then(function (data) {
+                if (data && data.success) {
+                    row.classList.remove("notif-unread");
+                    row.classList.add("notif-read");
+                    const current = parseInt(badge.textContent, 10) || 0;
+                    updateBadge(Math.max(0, current - 1));
+                }
+            })
+            .catch(function () { /* ignore */ });
+    }
+
+    bell.addEventListener("click", function () {
+        const opening = panel.hidden;
+        panel.hidden = !panel.hidden;
+        bell.setAttribute("aria-expanded", opening ? "true" : "false");
+        // Opening the panel does not mark anything read; only clicking
+        // an item does.
+        if (opening) { load(); }
+    });
+
+    closeBtn.addEventListener("click", function () {
+        panel.hidden = true;
+        bell.setAttribute("aria-expanded", "false");
+    });
+
+    document.addEventListener("click", function (event) {
+        if (panel.hidden) { return; }
+        if (panel.contains(event.target) || bell.contains(event.target)) { return; }
+        panel.hidden = true;
+        bell.setAttribute("aria-expanded", "false");
+    });
+
+    // Load once on page load so the unread badge is correct immediately.
+    load();
+})();
+</script>
 </body>
 </html>

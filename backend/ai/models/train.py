@@ -1,6 +1,9 @@
+import hashlib
 import pandas as pd
 import numpy as np
 from pathlib import Path
+
+import sklearn
 
 from sklearn.model_selection import GroupShuffleSplit
 from sklearn.pipeline import Pipeline
@@ -621,7 +624,12 @@ config = {
     "risk_score_scale": "0-100",
     "model_type": "logistic_regression",
     "step_up_authentication": "IFHE_EMAIL_2FA",
-    "trust_score_used_for_risk_prediction": False
+    "trust_score_used_for_risk_prediction": False,
+    "model_version": "logistic-regression-v1",
+    "trained_sklearn_version": sklearn.__version__,
+    "artifact_sha256": hashlib.sha256(
+        model_path.read_bytes()
+    ).hexdigest()
 }
 
 

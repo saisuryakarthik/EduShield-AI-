@@ -1,26 +1,22 @@
 from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
 import datetime
+import logging
 import os
-import threading
 import uuid
 from config import JWT_SECRET
 from functools import wraps
 from flask import request, jsonify
 
+import revocation
+
+
+logger = logging.getLogger("edushield.auth")
+
 
 # Token lifetime. Short enough to limit the damage of a leaked token,
 # long enough not to be disruptive. Override with EDUSHIELD_TOKEN_TTL_MINUTES.
 TOKEN_TTL_MINUTES = int(os.getenv("EDUSHIELD_TOKEN_TTL_MINUTES", "60"))
-
-
-# In-process revocation list, keyed by the token's `jti`.
-#
-# LIMITATION: this is per-process and lost on restart, so it is a
-# best-effort revocation until a shared store (or a DB column) is added.
-# It is still strictly better than cookie-only logout.
-_revoked_lock = threading.Lock()
-_revoked_jtis = set()
 
 
 def hash_password(password: str) -> str:
@@ -54,22 +50,52 @@ def decode_token(token: str):
         return None
 
 
-def revoke_token(payload) -> bool:
-    """Add a decoded token's jti to the revocation list."""
+def revoke_token(payload, reason="logout") -> bool:
+    """
+    Persist a decoded token's revocation.
+
+    The revocation is written to the database, so it survives an
+    application restart and is shared by every worker of a multi-process
+    server. Only the token identifier is stored, never the token
+    itself.
+    """
 
     jti = (payload or {}).get("jti")
+    user_id = (payload or {}).get("user_id")
 
-    if not jti:
+    if not jti or not user_id:
         return False
 
-    with _revoked_lock:
-        _revoked_jtis.add(jti)
+    expires_at = (payload or {}).get("exp")
 
-    return True
+    if expires_at is None:
+        expires_at = (
+            datetime.datetime.now(datetime.timezone.utc)
+            + datetime.timedelta(minutes=TOKEN_TTL_MINUTES)
+        )
+
+    revoked = revocation.revoke(
+        jti,
+        user_id,
+        expires_at,
+        reason=reason
+    )
+
+    if revoked:
+        # Opportunistic cleanup: rows for tokens that have already
+        # expired can never affect an access decision.
+        revocation.cleanup_expired()
+
+    return revoked
 
 
 def is_token_revoked(payload) -> bool:
-    """True when the token has been revoked."""
+    """
+    True when the token has been revoked.
+
+    Raises revocation.RevocationUnavailable when the store cannot be
+    read, so the caller can fail closed.
+    """
 
     jti = (payload or {}).get("jti")
 
@@ -77,8 +103,7 @@ def is_token_revoked(payload) -> bool:
         # Legacy tokens issued before jti existed cannot be revoked.
         return False
 
-    with _revoked_lock:
-        return jti in _revoked_jtis
+    return revocation.is_revoked(jti)
 
 
 def require_auth(allowed_roles=None):
@@ -102,7 +127,24 @@ def require_auth(allowed_roles=None):
                     "message": "Invalid or expired token"
                 }), 401
 
-            if is_token_revoked(payload):
+            try:
+                revoked = is_token_revoked(payload)
+            except revocation.RevocationUnavailable:
+                # The revocation state could not be read. The token is
+                # NOT accepted: an unverifiable token never passes.
+                logger.exception(
+                    "Revocation store unavailable; refusing the request"
+                )
+
+                return jsonify({
+                    "success": False,
+                    "message": (
+                        "Authentication is temporarily unavailable. "
+                        "Please try again."
+                    )
+                }), 503
+
+            if revoked:
                 return jsonify({
                     "success": False,
                     "message": "Invalid or expired token"

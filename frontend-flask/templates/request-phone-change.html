@@ -164,14 +164,14 @@
 
         function getLocation() {
             if (!navigator.geolocation) {
-                setStatus("❌ This browser does not support location services.");
+                setStatus("⚠️ Location unavailable. You can still continue.");
+                updateSubmitState();
                 return;
             }
 
             if (locationRequestInProgress) return;
 
             locationRequestInProgress = true;
-            submitButton.disabled = true;
             setStatus("📍 Detecting your location...");
 
             navigator.geolocation.getCurrentPosition(
@@ -202,17 +202,18 @@
                 function (error) {
                     locationRequestInProgress = false;
                     locationReady = false;
-                    submitButton.disabled = true;
 
                     if (error.code === 1) {
-                        setStatus("❌ Allow location access in your browser to continue.");
+                        setStatus("⚠️ Location permission denied. You can still continue.");
                     } else if (error.code === 2) {
-                        setStatus("⚠️ Location unavailable. Please try again.");
+                        setStatus("⚠️ Location unavailable. You can still continue.");
                     } else if (error.code === 3) {
-                        setStatus("⚠️ Location timed out. Please retry.");
+                        setStatus("⚠️ Location timed out. You can still continue.");
                     } else {
-                        setStatus("❌ Unable to retrieve location.");
+                        setStatus("⚠️ Unable to retrieve location. You can still continue.");
                     }
+
+                    updateSubmitState();
                 },
                 {
                     enableHighAccuracy: false,
@@ -223,8 +224,9 @@
         }
 
         function updateSubmitState() {
+            // Location is an optional risk signal, never a form gate.
             const validPhone = /^[0-9]{10}$/.test(phoneInput.value);
-            submitButton.disabled = !(locationReady && validPhone);
+            submitButton.disabled = !validPhone;
         }
 
         phoneInput.addEventListener("input", function () {
@@ -245,10 +247,10 @@
                 longitude >= -180 && longitude <= 180;
 
             if (!validLocation) {
-                event.preventDefault();
-                setStatus("❌ Location access is required. Please retry.");
-                getLocation();
-                return;
+                // Submit without coordinates. The backend records the
+                // missing signal; the request and OTP flow continue.
+                latitudeInput.value = "";
+                longitudeInput.value = "";
             }
 
             if (!/^[0-9]{10}$/.test(phoneInput.value)) {

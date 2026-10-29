@@ -292,31 +292,7 @@
                     const hint = card.querySelector("[data-hint]");
                     if (hint) hint.remove();
                     showMsg(msg, "Code verified.", "ok");
-    const resend = document.getElementById("resendBtn");
-    if (resend) {
-        resend.addEventListener("click", async () => {
-            resend.disabled = true;
-            const msg = document.getElementById("resendMsg");
-            try {
-                const response = await fetch("/parent/resend/" + encodeURIComponent(token), {
-                    method: "POST"
-                });
-                let data = {};
-                try { data = await response.json(); } catch (_) {}
-                if (response.ok && data.success) {
-                    showMsg(msg, "New codes sent. Check your email and mobile messages.", "ok");
-                } else {
-                    showMsg(msg, data.message || "Could not resend codes.", "error");
-                }
-            } catch (_) {
-                showMsg(msg, "Network error. Please try again.", "error");
-            } finally {
-                resend.disabled = false;
-            }
-        });
-    }
-
-    refreshDoneState();
+                    refreshDoneState();
                     return;
                 }
 
@@ -340,6 +316,30 @@
             }
         });
     });
+
+    const resend = document.getElementById("resendBtn");
+    if (resend) {
+        resend.addEventListener("click", async () => {
+            resend.disabled = true;
+            const msg = document.getElementById("resendMsg");
+            try {
+                const response = await fetch("/parent/resend/" + encodeURIComponent(token), {
+                    method: "POST"
+                });
+                let data = {};
+                try { data = await response.json(); } catch (_) {}
+                if (response.ok && data.success) {
+                    showMsg(msg, "New codes sent. Check your email and mobile messages.", "ok");
+                } else {
+                    showMsg(msg, data.message || "Could not resend codes.", "error");
+                }
+            } catch (_) {
+                showMsg(msg, "Network error. Please try again.", "error");
+            } finally {
+                resend.disabled = false;
+            }
+        });
+    }
 
     const report = document.getElementById("reportBtn");
     if (report) {

@@ -1,3 +1,4 @@
+import hashlib
 import os
 import json
 import joblib
@@ -68,13 +69,39 @@ if not os.path.exists(CONFIG_PATH):
     )
 
 
-# ============================================================
-# LOAD TRAINED MODEL
-# ============================================================
+def file_sha256(path):
+    """SHA-256 of an artifact file."""
 
-model = joblib.load(
-    MODEL_PATH
-)
+    digest = hashlib.sha256()
+
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(65536), b""):
+            digest.update(chunk)
+
+    return digest.hexdigest()
+
+
+def verify_artifact_integrity(path, expected_digest):
+    """
+    Refuse to load a model whose bytes do not match the pinned digest.
+
+    The digest is optional for older artifacts, but when present it
+    stops a replaced or corrupted .pkl from being executed by joblib.
+    """
+
+    if not expected_digest:
+        return True
+
+    actual_digest = file_sha256(path)
+
+    if actual_digest != str(expected_digest).lower():
+        raise ValueError(
+            "Model artifact integrity check failed: "
+            "logistic_regression.pkl does not match the digest in "
+            "config.json. Re-deploy the trusted artifact or retrain."
+        )
+
+    return True
 
 
 # ============================================================
@@ -97,6 +124,26 @@ with open(
     "r"
 ) as f:
     CONFIG = json.load(f)
+
+
+MODEL_VERSION = CONFIG.get(
+    "model_version",
+    "logistic-regression-v1"
+)
+
+
+# ============================================================
+# VERIFY AND LOAD TRAINED MODEL
+# ============================================================
+
+verify_artifact_integrity(
+    MODEL_PATH,
+    CONFIG.get("artifact_sha256")
+)
+
+model = joblib.load(
+    MODEL_PATH
+)
 
 
 # ============================================================
@@ -297,6 +344,13 @@ def get_model_info():
         "model_type": CONFIG.get(
             "model_type",
             "logistic_regression"
+        ),
+        "model_version": MODEL_VERSION,
+        "trained_sklearn_version": CONFIG.get(
+            "trained_sklearn_version"
+        ),
+        "artifact_sha256": CONFIG.get(
+            "artifact_sha256"
         ),
         "risk_threshold": CONFIG.get(
             "risk_threshold",

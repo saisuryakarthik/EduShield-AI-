@@ -3,5 +3,8 @@
     "risk_score_scale": "0-100",
     "model_type": "logistic_regression",
     "step_up_authentication": "IFHE_EMAIL_2FA",
-    "trust_score_used_for_risk_prediction": false
+    "trust_score_used_for_risk_prediction": false,
+    "model_version": "logistic-regression-v1",
+    "trained_sklearn_version": "1.9.0",
+    "artifact_sha256": "09a3b7825c71e3ca2d85d04f8062ef8ae55b0c4150f894bf774d7d1fa8d1a748"
 }

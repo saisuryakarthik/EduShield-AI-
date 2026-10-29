@@ -39,6 +39,14 @@ Thumbs.db
 *.log
 
 # =========================
+# Backups / dumps (may contain personal data)
+# =========================
+*.bak
+*.backup
+*.sql.gz
+backups/
+
+# =========================
 # Temporary files
 # =========================
 *.tmp

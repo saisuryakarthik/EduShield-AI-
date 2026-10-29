@@ -1,4 +1,12 @@
-from flask import Flask, render_template, redirect, request, make_response
+from flask import (
+    Flask,
+    jsonify,
+    make_response,
+    redirect,
+    render_template,
+    request,
+)
+from functools import wraps
 import os
 import requests
 import uuid
@@ -9,13 +17,24 @@ app = Flask(__name__)
 # CONFIGURATION
 # =========================================================
 
-BACKEND_URL = "http://127.0.0.1:5000/api"
+# Server-to-server backend URL. Override with EDUSHIELD_BACKEND_URL when
+# validating the backend through an HTTPS tunnel; never hardcode a tunnel.
+BACKEND_URL = os.getenv(
+    "EDUSHIELD_BACKEND_URL", "http://127.0.0.1:5000/api"
+).rstrip("/")
+BACKEND_ORIGIN = BACKEND_URL.rsplit("/api", 1)[0]
 HTTP_TIMEOUT = (5, 20)
 REQUEST_TIMEOUT = 10
 
 # Send session cookies only over HTTPS. Off for local HTTP development;
 # set EDUSHIELD_COOKIE_SECURE=1 in production.
 COOKIE_SECURE = os.getenv("EDUSHIELD_COOKIE_SECURE", "0") == "1"
+
+# Keep browser cookies aligned with the backend JWT lifetime. The backend
+# defaults to 60 minutes (EDUSHIELD_TOKEN_TTL_MINUTES); a longer cookie would
+# only leave an expired token in the browser and force a redirect.
+TOKEN_TTL_MINUTES = int(os.getenv("EDUSHIELD_TOKEN_TTL_MINUTES", "60"))
+AUTH_COOKIE_MAX_AGE = max(60, TOKEN_TTL_MINUTES * 60)
 
 
 # =========================================================
@@ -111,6 +130,89 @@ def get_auth_headers(token):
 
 
 # =========================================================
+# SESSION / ROLE ENFORCEMENT
+#
+# The auth_token cookie is a JWT. We never trust its contents or
+# the user_role cookie from the browser: we ask the backend to
+# validate the token (signature + revocation) via /api/auth/me and
+# use the role it returns. A cookie that merely exists is not
+# enough.
+# =========================================================
+
+class AuthError(Exception):
+    """Raised when a token is missing or invalid."""
+
+
+def get_current_user():
+    """
+    Validate the auth_token cookie against the backend.
+
+    Returns the trusted user dict, or None when there is no cookie,
+    the token is rejected, or the backend is unreachable.
+    """
+
+    token = request.cookies.get("auth_token")
+
+    if not token:
+        return None
+
+    try:
+        response = requests.get(
+            f"{BACKEND_URL}/auth/me",
+            headers=get_auth_headers(token),
+            timeout=REQUEST_TIMEOUT
+        )
+
+        if response.status_code != 200:
+            return None
+
+        data = safe_json(response)
+
+        if not data.get("success"):
+            return None
+
+        return data.get("user") or None
+
+    except requests.RequestException as e:
+        print(
+            "🔥 SESSION VALIDATION ERROR:",
+            repr(e),
+            flush=True
+        )
+        return None
+
+
+def require_role(*allowed_roles):
+    """
+    Server-side guard for frontend routes.
+
+    Redirects to /login when the session is missing or invalid, and
+    to /dashboard when the authenticated user's role is not allowed.
+    The trusted user is passed to the view as `current_user`.
+    """
+
+    def decorator(view):
+
+        @wraps(view)
+        def wrapper(*args, **kwargs):
+
+            user = get_current_user()
+
+            if not user:
+                return redirect("/login")
+
+            if allowed_roles and user.get("role") not in allowed_roles:
+                return redirect("/dashboard")
+
+            return view(*args, **kwargs, current_user=user)
+
+        return wrapper
+
+    return decorator
+
+
+
+# =========================================================
 # SAFE JSON
 # =========================================================
 
@@ -192,19 +294,6 @@ def login_page():
             )
 
         # -------------------------------------------------
-        # GET GPS
-        # -------------------------------------------------
-
-        latitude, longitude = get_client_location()
-
-        if latitude is None or longitude is None:
-
-            return render_template(
-                "login.html",
-                error="Valid location is required to login."
-            )
-
-        # -------------------------------------------------
         # DEVICE
         # -------------------------------------------------
 
@@ -229,9 +318,7 @@ def login_page():
                 },
 
                 headers={
-                    "X-Device-ID": device_id,
-                    "X-Client-Latitude": str(latitude),
-                    "X-Client-Longitude": str(longitude)
+                    "X-Device-ID": device_id
                 },
 
                 timeout=REQUEST_TIMEOUT
@@ -277,7 +364,7 @@ def login_page():
                     token,
                     httponly=True,
                     secure=COOKIE_SECURE,
-                    max_age=28800,
+                    max_age=AUTH_COOKIE_MAX_AGE,
                     samesite="Strict",
                     path="/"
                 )
@@ -287,7 +374,7 @@ def login_page():
                     user.get("role", "student"),
                     httponly=True,
                     secure=COOKIE_SECURE,
-                    max_age=28800,
+                    max_age=AUTH_COOKIE_MAX_AGE,
                     samesite="Strict",
                     path="/"
                 )
@@ -363,7 +450,7 @@ def login_page():
 
             return render_template(
                 "login.html",
-                error=f"Backend connection error: {e}"
+                error="Backend connection error. Please try again."
             )
 
         except Exception as e:
@@ -376,7 +463,7 @@ def login_page():
 
             return render_template(
                 "login.html",
-                error=str(e)
+                error="An unexpected error occurred. Please try again."
             )
 
     return render_template("login.html")
@@ -387,12 +474,10 @@ def login_page():
 # =========================================================
 
 @app.route("/student-dashboard", methods=["GET"])
-def student_dashboard():
+@require_role("student")
+def student_dashboard(current_user):
 
     token = request.cookies.get("auth_token")
-
-    if not token:
-        return redirect("/login")
 
     try:
 
@@ -419,8 +504,8 @@ def student_dashboard():
 
         return render_template(
             "student-dashboard.html",
-            user_name="Rahul",
-            user_id="S1024",
+            user_name=current_user.get("name") or "Student",
+            user_id=current_user.get("user_id") or "",
             requests=requests_list
         )
 
@@ -434,20 +519,26 @@ def student_dashboard():
 
         return render_template(
             "student-dashboard.html",
-            user_name="Rahul",
-            user_id="S1024",
+            user_name=current_user.get("name") or "Student",
+            user_id=current_user.get("user_id") or "",
             requests=[],
             error="Unable to connect to backend server."
         )
 
     except Exception as e:
 
+        print(
+            "🔥 STUDENT DASHBOARD ERROR:",
+            repr(e),
+            flush=True
+        )
+
         return render_template(
             "student-dashboard.html",
-            user_name="Rahul",
-            user_id="S1024",
+            user_name=current_user.get("name") or "Student",
+            user_id=current_user.get("user_id") or "",
             requests=[],
-            error=str(e)
+            error="Unable to load your requests right now."
         )
 
 
@@ -493,11 +584,9 @@ def logout():
 # =========================================================
 
 @app.route("/request-phone-change", methods=["GET", "POST"])
-def request_phone_change():
+@require_role("student")
+def request_phone_change(current_user):
     token = request.cookies.get("auth_token")
-
-    if not token:
-        return redirect("/login")
 
     if request.method == "POST" and not check_same_origin():
         return render_template(
@@ -571,17 +660,9 @@ def request_phone_change():
         )
 
     # -----------------------------------------------------
-    # VALIDATE CLIENT GPS LOCATION
+    # CLIENT GPS LOCATION (OPTIONAL RISK SIGNAL)
     # -----------------------------------------------------
     latitude, longitude = get_client_location()
-
-    if latitude is None or longitude is None:
-        return render_template(
-            "request-phone-change.html",
-            old_phone=old_phone,
-            new_phone=new_phone,
-            error="Valid location is required to submit a phone change request."
-        )
 
     # -----------------------------------------------------
     # SUBMIT PHONE CHANGE REQUEST TO BACKEND
@@ -589,8 +670,9 @@ def request_phone_change():
     try:
         headers = get_auth_headers(token)
 
-        headers["X-Client-Latitude"] = str(latitude)
-        headers["X-Client-Longitude"] = str(longitude)
+        if latitude is not None and longitude is not None:
+            headers["X-Client-Latitude"] = str(latitude)
+            headers["X-Client-Longitude"] = str(longitude)
 
         response = requests.post(
             f"{BACKEND_URL}/phone-change-requests",
@@ -637,7 +719,12 @@ def request_phone_change():
         error = "Backend server took too long to respond."
 
     except requests.RequestException as e:
-        error = f"Backend connection error: {e}"
+        print(
+            "Phone change backend error:",
+            repr(e),
+            flush=True
+        )
+        error = "Backend connection error. Please try again."
 
     except Exception as e:
         print(
@@ -662,12 +749,10 @@ def request_phone_change():
     "/mentor-dashboard",
     methods=["GET"]
 )
-def mentor_dashboard():
+@require_role("mentor")
+def mentor_dashboard(current_user):
 
     token = request.cookies.get("auth_token")
-
-    if not token:
-        return redirect("/login")
 
     status_filter = request.args.get(
         "status",
@@ -710,8 +795,8 @@ def mentor_dashboard():
 
         return render_template(
             "mentor-dashboard.html",
-            mentor_name="Dr. Harsha",
-            mentor_id="M021",
+            mentor_name=current_user.get("name") or "Mentor",
+            mentor_id=current_user.get("user_id") or "",
             requests=requests_list,
             current_filter=status_filter
         )
@@ -726,8 +811,8 @@ def mentor_dashboard():
 
         return render_template(
             "mentor-dashboard.html",
-            mentor_name="Dr. Harsha",
-            mentor_id="M021",
+            mentor_name=current_user.get("name") or "Mentor",
+            mentor_id=current_user.get("user_id") or "",
             requests=[],
             current_filter=status_filter,
             error="Unable to connect to backend server."
@@ -735,14 +820,146 @@ def mentor_dashboard():
 
     except Exception as e:
 
+        print(
+            "🔥 MENTOR DASHBOARD ERROR:",
+            repr(e),
+            flush=True
+        )
+
         return render_template(
             "mentor-dashboard.html",
-            mentor_name="Dr. Harsha",
-            mentor_id="M021",
+            mentor_name=current_user.get("name") or "Mentor",
+            mentor_id=current_user.get("user_id") or "",
             requests=[],
             current_filter=status_filter,
-            error=str(e)
+            error="Unable to load the dashboard right now."
         )
+
+
+# =========================================================
+# NOTIFICATIONS (BFF proxy for the in-app inbox)
+#
+# The backend owns all ownership checks. These routes only relay the
+# caller's own auth token, so they can never widen access.
+# =========================================================
+
+@app.route(
+    "/notifications",
+    methods=["GET"]
+)
+@require_role("student", "mentor", "admin")
+def notifications_feed(current_user):
+
+    token = request.cookies.get("auth_token")
+
+    try:
+        response = requests.get(
+            f"{BACKEND_URL}/notifications",
+            headers=get_auth_headers(token),
+            timeout=REQUEST_TIMEOUT
+        )
+
+        return jsonify(safe_json(response)), response.status_code
+
+    except requests.RequestException as e:
+        print("🔥 NOTIFICATIONS FEED ERROR:", repr(e), flush=True)
+
+        return jsonify({
+            "success": False,
+            "notifications": [],
+            "unread": 0,
+            "message": "Backend server is unreachable."
+        }), 502
+
+
+@app.route(
+    "/notifications/<int:notification_id>/read",
+    methods=["POST"]
+)
+@require_role("student", "mentor", "admin")
+def notifications_mark_read(notification_id, current_user):
+
+    token = request.cookies.get("auth_token")
+
+    if not check_same_origin():
+        return jsonify({
+            "success": False,
+            "message": "Request blocked for security reasons."
+        }), 403
+
+    try:
+        response = requests.post(
+            f"{BACKEND_URL}/notifications/{notification_id}/read",
+            headers=get_auth_headers(token),
+            timeout=REQUEST_TIMEOUT
+        )
+
+        return jsonify(safe_json(response)), response.status_code
+
+    except requests.RequestException as e:
+        print("🔥 NOTIFICATION READ ERROR:", repr(e), flush=True)
+
+        return jsonify({
+            "success": False,
+            "message": "Backend server is unreachable."
+        }), 502
+
+
+# =========================================================
+# PARENT VERIFICATION PROXY
+# =========================================================
+
+def proxy_parent_request(path):
+    url = f"{BACKEND_ORIGIN}/{path}"
+
+    try:
+        if request.method == "GET":
+            upstream = requests.get(
+                url,
+                headers={"Accept": request.headers.get("Accept", "*/*")},
+                timeout=HTTP_TIMEOUT
+            )
+        else:
+            upstream = requests.post(
+                url,
+                json=request.get_json(silent=True),
+                headers={"Accept": request.headers.get("Accept", "*/*")},
+                timeout=HTTP_TIMEOUT
+            )
+    except requests.RequestException as e:
+        print("🔥 PARENT VERIFY PROXY ERROR:", repr(e), flush=True)
+        return (
+            "Parent verification service is temporarily unavailable.",
+            502,
+            {"Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store"}
+        )
+
+    response = make_response(upstream.content, upstream.status_code)
+    response.headers["Content-Type"] = upstream.headers.get(
+        "Content-Type", "text/html; charset=utf-8"
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.route("/parent/verify/<token>", methods=["GET"])
+def proxy_parent_page(token):
+    return proxy_parent_request(f"parent/verify/{token}")
+
+
+@app.route("/parent/verify/<token>/<channel>", methods=["POST"])
+def proxy_parent_code(token, channel):
+    return proxy_parent_request(f"parent/verify/{token}/{channel}")
+
+
+@app.route("/parent/resend/<token>", methods=["POST"])
+def proxy_parent_resend(token):
+    return proxy_parent_request(f"parent/resend/{token}")
+
+
+@app.route("/parent/report/<token>", methods=["POST"])
+def proxy_parent_report(token):
+    return proxy_parent_request(f"parent/report/{token}")
 
 
 # =========================================================
@@ -753,12 +970,10 @@ def mentor_dashboard():
     "/request-detail/<request_id>",
     methods=["GET", "POST"]
 )
-def request_detail(request_id):
+@require_role("student", "mentor", "admin")
+def request_detail(request_id, current_user):
 
     token = request.cookies.get("auth_token")
-
-    if not token:
-        return redirect("/login")
 
     # =====================================================
     # MENTOR DECISION
@@ -835,9 +1050,15 @@ def request_detail(request_id):
 
         except Exception as e:
 
+            print(
+                "🔥 REQUEST DECISION ERROR:",
+                repr(e),
+                flush=True
+            )
+
             return render_template(
                 "request-detail.html",
-                error=str(e),
+                error="Unable to process the decision right now.",
                 request={
                     "request_id": request_id
                 }
@@ -876,15 +1097,17 @@ def request_detail(request_id):
             {}
         )
 
+        # The backend returns these keys as JSON null until the AI
+        # assessment has run (i.e. before both parent OTPs verify).
+        # A present-but-null key defeats the dict default, so coerce
+        # falsy values to an empty dict before any .get() calls.
         security = data.get(
-            "security_context",
-            {}
-        )
+            "security_context"
+        ) or {}
 
         ai = data.get(
-            "ai_assessment",
-            {}
-        )
+            "ai_assessment"
+        ) or {}
 
         # =================================================
         # RISK FACTOR DETAILS
@@ -1073,14 +1296,20 @@ def request_detail(request_id):
         )
 
         return (
-            f"Error connecting to backend: {e}",
+            "Unable to load request details right now.",
             500
         )
 
     except Exception as e:
 
+        print(
+            "🔥 REQUEST DETAIL ERROR:",
+            repr(e),
+            flush=True
+        )
+
         return (
-            f"Error: {e}",
+            "Unable to load request details right now.",
             500
         )
 
@@ -1095,21 +1324,25 @@ def request_detail(request_id):
 )
 def dashboard():
 
-    token = request.cookies.get(
-        "auth_token"
-    )
+    # Validate the session and use the backend-confirmed role,
+    # never the browser-controlled user_role cookie.
+    user = get_current_user()
 
-    role = request.cookies.get(
-        "user_role"
-    )
-
-    if not token:
+    if not user:
         return redirect("/login")
+
+    role = user.get("role")
 
     if role == "student":
         return redirect("/student-dashboard")
 
-    return redirect("/mentor-dashboard")
+    if role == "admin":
+        return redirect("/admin-dashboard")
+
+    if role == "mentor":
+        return redirect("/mentor-dashboard")
+
+    return redirect("/login")
 
 
 # =========================================================
@@ -1120,12 +1353,10 @@ def dashboard():
     "/cancel-phone-change/<request_id>",
     methods=["POST"]
 )
-def cancel_phone_change(request_id):
+@require_role("student")
+def cancel_phone_change(request_id, current_user):
 
     token = request.cookies.get("auth_token")
-
-    if not token:
-        return redirect("/login")
 
     if not check_same_origin():
         return redirect("/student-dashboard")
@@ -1144,6 +1375,363 @@ def cancel_phone_change(request_id):
 
 
 # =========================================================
+# DELETE PHONE CHANGE (student soft delete)
+# =========================================================
+
+@app.route(
+    "/delete-phone-change/<request_id>",
+    methods=["POST"]
+)
+@require_role("student")
+def delete_phone_change(request_id, current_user):
+
+    token = request.cookies.get("auth_token")
+
+    if not check_same_origin():
+        return redirect("/student-dashboard")
+
+    try:
+        requests.post(
+            f"{BACKEND_URL}/phone-change-requests/{request_id}/delete",
+            headers=get_auth_headers(token),
+            timeout=REQUEST_TIMEOUT
+        )
+
+    except requests.RequestException as e:
+        print("🔥 DELETE REQUEST ERROR:", repr(e), flush=True)
+
+    return redirect("/student-dashboard")
+
+
+# =========================================================
+# NOTIFY MENTOR (student)
+#
+# Relays the request to the backend and returns its JSON status so the
+# dashboard can show the outcome (including the 429 rate limit) without
+# a full page reload.
+# =========================================================
+
+@app.route(
+    "/notify-mentor/<request_id>",
+    methods=["POST"]
+)
+@require_role("student")
+def notify_mentor(request_id, current_user):
+
+    token = request.cookies.get("auth_token")
+
+    if not check_same_origin():
+        return jsonify({
+            "success": False,
+            "message": "Request blocked for security reasons."
+        }), 403
+
+    try:
+        response = requests.post(
+            f"{BACKEND_URL}/phone-change-requests/{request_id}/notify-mentor",
+            headers=get_auth_headers(token),
+            timeout=REQUEST_TIMEOUT
+        )
+
+        return jsonify(safe_json(response)), response.status_code
+
+    except requests.RequestException as e:
+        print("🔥 NOTIFY MENTOR ERROR:", repr(e), flush=True)
+
+        return jsonify({
+            "success": False,
+            "message": "Backend server is unreachable."
+        }), 502
+
+
+# =========================================================
+# ACCOUNT ACTIVATION (Phase 1)
+#
+# Two steps on one page: request a code, then enter it with a new
+# password. The frontend only relays; the backend owns all rules.
+# =========================================================
+
+@app.route("/activate", methods=["GET", "POST"])
+def activate():
+    if request.method == "POST":
+        if not check_same_origin():
+            return render_template(
+                "activate.html",
+                error="Request blocked for security reasons."
+            ), 403
+
+        step = request.form.get("step", "request").strip()
+        external_id = request.form.get("external_id", "").strip()
+
+        if step == "request":
+            if not external_id:
+                return render_template(
+                    "activate.html",
+                    error="Enter your Student or Mentor ID."
+                )
+
+            try:
+                response = requests.post(
+                    f"{BACKEND_URL}/auth/activate/request",
+                    json={"external_id": external_id},
+                    timeout=REQUEST_TIMEOUT
+                )
+                data = safe_json(response)
+
+                return render_template(
+                    "activate.html",
+                    step="verify",
+                    external_id=external_id,
+                    info=data.get(
+                        "message",
+                        "If that ID matches a pending account, an "
+                        "activation code has been emailed."
+                    )
+                )
+
+            except requests.RequestException as e:
+                print("🔥 ACTIVATION REQUEST ERROR:", repr(e), flush=True)
+                return render_template(
+                    "activate.html",
+                    error="Backend server is unreachable."
+                )
+
+        # step == "verify"
+        code = request.form.get("code", "").strip()
+        password = request.form.get("password", "")
+        confirm = request.form.get("confirm_password", "")
+
+        if password != confirm:
+            return render_template(
+                "activate.html",
+                step="verify",
+                external_id=external_id,
+                error="Passwords do not match."
+            )
+
+        try:
+            response = requests.post(
+                f"{BACKEND_URL}/auth/activate/verify",
+                json={
+                    "external_id": external_id,
+                    "code": code,
+                    "password": password,
+                    "confirm_password": confirm
+                },
+                timeout=REQUEST_TIMEOUT
+            )
+            data = safe_json(response)
+
+            if response.status_code == 200:
+                return render_template(
+                    "activate.html",
+                    step="done"
+                )
+
+            return render_template(
+                "activate.html",
+                step="verify",
+                external_id=external_id,
+                error=data.get("message", "Activation failed.")
+            )
+
+        except requests.RequestException as e:
+            print("🔥 ACTIVATION VERIFY ERROR:", repr(e), flush=True)
+            return render_template(
+                "activate.html",
+                step="verify",
+                external_id=external_id,
+                error="Backend server is unreachable."
+            )
+
+    return render_template("activate.html", step="request")
+
+
+# =========================================================
+# ADMIN PORTAL (Phase 1)
+# =========================================================
+
+def _admin_headers():
+    """
+    Return auth headers for the current request.
+
+    Callers must already be guarded by @require_role("admin"), which
+    has validated the token and role against the backend.
+    """
+
+    return get_auth_headers(request.cookies.get("auth_token"))
+
+
+@app.route("/admin-dashboard", methods=["GET"])
+@require_role("admin")
+def admin_dashboard(current_user):
+    headers = _admin_headers()
+
+    summary = {}
+    error = None
+
+    try:
+        response = requests.get(
+            f"{BACKEND_URL}/admin/summary",
+            headers=headers,
+            timeout=REQUEST_TIMEOUT
+        )
+        data = safe_json(response)
+
+        if response.status_code == 200:
+            summary = data.get("summary", {})
+        else:
+            error = data.get("message", "Failed to load summary.")
+
+    except requests.RequestException as e:
+        print("🔥 ADMIN SUMMARY ERROR:", repr(e), flush=True)
+        error = "Unable to connect to backend server."
+
+    return render_template(
+        "admin-dashboard.html",
+        summary=summary,
+        error=error
+    )
+
+
+@app.route("/admin-users", methods=["GET"])
+@require_role("admin")
+def admin_users(current_user):
+    headers = _admin_headers()
+
+    role = request.args.get("role", "").strip()
+    status = request.args.get("status", "").strip()
+    query = request.args.get("q", "").strip()
+
+    users = []
+    error = None
+
+    try:
+        response = requests.get(
+            f"{BACKEND_URL}/admin/users",
+            headers=headers,
+            params={"role": role, "status": status, "q": query},
+            timeout=REQUEST_TIMEOUT
+        )
+        data = safe_json(response)
+
+        if response.status_code == 200:
+            users = data.get("users", [])
+        else:
+            error = data.get("message", "Failed to load users.")
+
+    except requests.RequestException as e:
+        print("🔥 ADMIN USERS ERROR:", repr(e), flush=True)
+        error = "Unable to connect to backend server."
+
+    return render_template(
+        "admin-users.html",
+        users=users,
+        role=role,
+        status=status,
+        query=query,
+        error=error
+    )
+
+
+def _parse_assignment_lines(raw):
+    """Turn 'STU,MEN' lines into a list of assignment dicts."""
+
+    assignments = []
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = [part.strip() for part in line.replace("\t", ",").split(",")]
+        if len(parts) < 2 or not parts[0] or not parts[1]:
+            continue
+        assignments.append({
+            "student_id": parts[0],
+            "mentor_id": parts[1],
+        })
+    return assignments
+
+
+def _parse_id_lines(raw):
+    return [line.strip() for line in raw.splitlines() if line.strip()]
+
+
+@app.route("/admin-assign", methods=["GET", "POST"])
+@require_role("admin")
+def admin_assign(current_user):
+    headers = _admin_headers()
+
+    message = None
+    error = None
+
+    if request.method == "POST":
+        if not check_same_origin():
+            return render_template(
+                "admin-assign.html",
+                error="Request blocked for security reasons."
+            ), 403
+
+        action = request.form.get("action", "assign").strip()
+
+        try:
+            if action == "assign":
+                assignments = _parse_assignment_lines(
+                    request.form.get("assignments", "")
+                )
+                if not assignments:
+                    error = "Enter at least one 'student_id,mentor_id' line."
+                else:
+                    response = requests.post(
+                        f"{BACKEND_URL}/admin/assignments/bulk",
+                        json={"assignments": assignments},
+                        headers=headers,
+                        timeout=REQUEST_TIMEOUT
+                    )
+                    data = safe_json(response)
+
+                    if response.status_code == 200:
+                        message = (
+                            f"Assigned: {data.get('created', 0)} new, "
+                            f"{data.get('updated', 0)} updated, "
+                            f"{len(data.get('failed', []))} failed."
+                        )
+                    else:
+                        error = data.get("message", "Bulk assign failed.")
+
+            elif action == "unassign":
+                student_ids = _parse_id_lines(
+                    request.form.get("student_ids", "")
+                )
+                if not student_ids:
+                    error = "Enter at least one student ID."
+                else:
+                    response = requests.post(
+                        f"{BACKEND_URL}/admin/assignments/unassign",
+                        json={"student_ids": student_ids},
+                        headers=headers,
+                        timeout=REQUEST_TIMEOUT
+                    )
+                    data = safe_json(response)
+
+                    if response.status_code == 200:
+                        message = (
+                            f"Unassigned {data.get('unassigned', 0)} student(s)."
+                        )
+                    else:
+                        error = data.get("message", "Unassign failed.")
+
+        except requests.RequestException as e:
+            print("🔥 ADMIN ASSIGN ERROR:", repr(e), flush=True)
+            error = "Unable to connect to backend server."
+
+    return render_template(
+        "admin-assign.html",
+        message=message,
+        error=error
+    )
+
+
+# =========================================================
 # START FRONTEND SERVER
 # =========================================================
 
@@ -1153,7 +1741,8 @@ if __name__ == "__main__":
     print("EDU-SHIELD FRONTEND")
     print("=" * 60)
     print("Backend:", BACKEND_URL)
-    print("Frontend: https://0.0.0.0:5002")
+    print("Frontend (development server): http://127.0.0.1:5002")
+    print("Do not use this server in production; run it under a WSGI server.")
     print("=" * 60)
 
     app.run(

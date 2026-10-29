@@ -91,6 +91,7 @@
                         </div>
                     </div>
 
+                    {% if security_context %}
                     <div class="security-signal-grid">
                         <div class="signal-card">
                             <span class="signal-label">Known device</span>
@@ -125,6 +126,12 @@
                             <strong>{{ "%.2f"|format(security_context.trust_score) }}</strong>
                         </div>
                     </div>
+                    {% else %}
+                    <div class="no-security-signals">
+                        <span>✓</span>
+                        <p>Security context is not available yet. It is captured when the request is submitted.</p>
+                    </div>
+                    {% endif %}
                 </section>
 
                 {% if ai_assessment %}
@@ -226,7 +233,9 @@
                         </div>
                         {% endfor %}
                     </div>
-                    {% if request.auth_status == 'VERIFIED' %}
+                    {% if request.status == 'SECURITY_HOLD' %}
+                    <p class="decision-hint">Security hold in effect. Mentor approval is blocked pending resolution.</p>
+                    {% elif request.auth_status == 'VERIFIED' %}
                     <p class="decision-hint">Both codes verified. The request is ready for your decision.</p>
                     {% else %}
                     <p class="decision-hint">Approval is locked until both the SMS and email codes are verified.</p>
@@ -256,7 +265,7 @@
 
                         <button type="submit" name="decision" value="APPROVED"
                             class="decision-action decision-approve"
-                            data-decision="APPROVED"{% if request.auth_status != 'VERIFIED' or request.status == 'SECURITY_HOLD' %} disabled title="Parent SMS and email verification must be completed first"{% endif %}>
+                            data-decision="APPROVED"{% if request.status == 'SECURITY_HOLD' %} disabled title="Security hold in effect. Mentor approval is blocked pending resolution."{% elif request.auth_status != 'VERIFIED' %} disabled title="Parent SMS and email verification must be completed first"{% endif %}>
                             <span>✓</span> Approve request
                         </button>
 

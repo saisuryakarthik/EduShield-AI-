@@ -1,0 +1,16 @@
+student_id,name,institutional_email,phone,department,section,year,mentor_id,parent_name,parent_phone,parent_email
+24STUCHH010221,Asha Reddy,asha.reddy@student.university.edu,9000000001,Computer Science,A,1,M021,Ramesh Reddy,9876500001,ramesh.reddy@example.com
+24STUCHH010238,Bilal Ahmed,bilal.ahmed@student.university.edu,9000000002,Computer Science,A,1,M021,Imran Ahmed,9876500002,imran.ahmed@example.com
+24STUCHH010244,Charu Iyer,charu.iyer@student.university.edu,9000000003,Computer Science,B,1,M021,Suresh Iyer,9876500003,suresh.iyer@example.com
+24STUCHH010257,Deepak Rao,deepak.rao@student.university.edu,9000000004,Computer Science,B,1,M021,Anil Rao,9876500004,anil.rao@example.com
+24STUCHH010263,Esha Gupta,esha.gupta@student.university.edu,9000000005,Electronics,A,1,M045,Sanjay Gupta,9876500005,sanjay.gupta@example.com
+24STUCHH010276,Farhan Ali,farhan.ali@student.university.edu,9000000006,Electronics,A,1,M045,Yusuf Ali,9876500006,yusuf.ali@example.com
+24STUCHH010282,Gita Menon,gita.menon@student.university.edu,9000000007,Electronics,B,1,M045,Pradeep Menon,9876500007,pradeep.menon@example.com
+24STUCHH010295,Harish Kumar,harish.kumar@student.university.edu,9000000008,Electronics,B,1,M045,Vijay Kumar,9876500008,vijay.kumar@example.com
+24STUCHH010301,Ishita Sen,ishita.sen@student.university.edu,9000000009,Mechanical,A,1,M067,Arun Sen,9876500009,arun.sen@example.com
+24STUCHH010318,Jai Verma,jai.verma@student.university.edu,9000000010,Mechanical,A,1,M067,Mohan Verma,9876500010,mohan.verma@example.com
+24STUCHH010324,Kavya Pillai,kavya.pillai@student.university.edu,9000000011,Mechanical,B,1,M067,Rajan Pillai,9876500011,rajan.pillai@example.com
+24STUCHH010337,Lokesh Nair,lokesh.nair@student.university.edu,9000000012,Mechanical,B,1,M067,Suresh Nair,9876500012,suresh.nair@example.com
+24STUCHH010343,Meghana Das,meghana.das@student.university.edu,9000000013,Computer Science,A,1,M021,Gopal Das,9876500013,gopal.das@example.com
+24STUCHH011384,Nikhil Joshi,nikhil.joshi@student.university.edu,9000000014,Electronics,B,1,M045,Mahesh Joshi,,mahesh.joshi@example.com
+24STUCHH011270,Omar Sheikh,omar.sheikh@student.university.edu,9000000015,Mechanical,A,1,,Rashid Sheikh,9876500015,rashid.sheikh@example.com

@@ -68,37 +68,12 @@
         {% endif %}
 
 
-        <!-- Location verification -->
-        <div
-            id="location-status"
-            class="info-box"
-            role="status"
-            aria-live="polite"
-        >
-            📍 Detecting your location...
-        </div>
-
-
         <!-- Login -->
         <form
             method="POST"
             class="login-form"
             id="login-form"
         >
-
-            <!-- GPS coordinates -->
-            <input
-                type="hidden"
-                id="latitude"
-                name="latitude"
-            >
-
-            <input
-                type="hidden"
-                id="longitude"
-                name="longitude"
-            >
-
 
             <!-- Email -->
             <div class="form-group">
@@ -143,35 +118,22 @@
                 type="submit"
                 class="btn-primary"
                 id="login-btn"
-                disabled
             >
                 Continue securely
             </button>
 
         </form>
 
-
-        <!-- Development credentials -->
-        <aside
-            class="test-credentials"
-            aria-label="Development test credentials"
+        <p
+            style="
+                margin-top: 16px;
+                text-align: center;
+                font-size: 0.8rem;
+            "
         >
-
-            <p class="small-text">
-                <strong>Development access</strong>
-            </p>
-
-            <p class="small-text">
-                Student:
-                rahul@univ.edu / test1234
-            </p>
-
-            <p class="small-text">
-                Mentor:
-                harsha@univ.edu / mentor1234
-            </p>
-
-        </aside>
+            First time here?
+            <a href="/activate">Activate your account</a>
+        </p>
 
 
         <!-- Security footer -->
@@ -184,7 +146,7 @@
                 line-height: 1.5;
             "
         >
-            Location-aware authentication · EduShield AI
+            Secure authentication · EduShield AI
         </footer>
 
     </section>
@@ -194,241 +156,32 @@
 
 <script>
 
+    /*
+     * The login form submits email and password to the backend.
+     * No browser location is required.
+     */
+
     const form =
         document.getElementById("login-form");
 
-    const latitudeInput =
-        document.getElementById("latitude");
-
-    const longitudeInput =
-        document.getElementById("longitude");
-
-    const locationStatus =
-        document.getElementById("location-status");
-
-    const loginButton =
-        document.getElementById("login-btn");
-
-    let locationReady = false;
-
-
-    /*
-     * Store and validate the browser's
-     * real location.
-     */
-    function setLocation(position) {
-
-        const latitude =
-            position.coords.latitude;
-
-        const longitude =
-            position.coords.longitude;
-
-
-        if (
-            !Number.isFinite(latitude) ||
-            !Number.isFinite(longitude) ||
-            latitude < -90 ||
-            latitude > 90 ||
-            longitude < -180 ||
-            longitude > 180
-        ) {
-
-            locationReady = false;
-
-            loginButton.disabled = true;
-
-            locationStatus.textContent =
-                "❌ Invalid location received. Please try again.";
-
-            return;
-        }
-
-
-        latitudeInput.value =
-            latitude;
-
-        longitudeInput.value =
-            longitude;
-
-
-        locationReady = true;
-
-        loginButton.disabled = false;
-
-
-        locationStatus.textContent =
-            "📍 Location verified. You're ready to continue.";
-    }
-
-
-    /*
-     * Handle location errors.
-     */
-    function locationError(error) {
-
-        console.error(
-            "GPS Error:",
-            error.code,
-            error.message
-        );
-
-
-        locationReady = false;
-
-        loginButton.disabled = true;
-
-
-        if (error.code === 1) {
-
-            locationStatus.textContent =
-                "❌ Please allow location access in your browser.";
-
-            return;
-        }
-
-
-        if (error.code === 2) {
-
-            locationStatus.textContent =
-                "⚠️ Location temporarily unavailable. Please try again.";
-
-            return;
-        }
-
-
-        if (error.code === 3) {
-
-            locationStatus.textContent =
-                "⚠️ Location is taking longer than expected. Please try again.";
-
-            return;
-        }
-
-
-        locationStatus.textContent =
-            "❌ Unable to detect your location.";
-    }
-
-
-    /*
-     * Request location.
-     *
-     * First attempt:
-     * use a recent cached location.
-     *
-     * Second attempt:
-     * request a fresh high-accuracy location.
-     */
-    function getLocation() {
-
-        if (!navigator.geolocation) {
-
-            locationStatus.textContent =
-                "❌ This browser does not support location services.";
-
-            return;
-        }
-
-
-        locationReady = false;
-
-        loginButton.disabled = true;
-
-
-        locationStatus.textContent =
-            "📍 Detecting your location...";
-
-
-        navigator.geolocation.getCurrentPosition(
-
-            function(position) {
-
-                setLocation(position);
-            },
-
-            function(error) {
-
-                console.log(
-                    "Cached location unavailable. Requesting fresh location..."
-                );
-
-
-                locationStatus.textContent =
-                    "📍 Getting fresh location...";
-
-
-                navigator.geolocation.getCurrentPosition(
-
-                    function(position) {
-
-                        setLocation(position);
-                    },
-
-                    function(error) {
-
-                        locationError(error);
-                    },
-
-                    {
-                        enableHighAccuracy: true,
-                        timeout: 30000,
-                        maximumAge: 0
-                    }
-                );
-            },
-
-            {
-                enableHighAccuracy: false,
-                timeout: 3000,
-                maximumAge: 300000
-            }
-        );
-    }
-
-
-    /*
-     * Detect location when page loads.
-     */
-    window.addEventListener(
-        "load",
-        getLocation
-    );
-
-
-    /*
-     * Never submit without valid coordinates.
-     */
     form.addEventListener(
         "submit",
         function(event) {
 
-            const latitude =
-                Number(latitudeInput.value);
+            const email =
+                document.getElementById("email").value.trim();
 
-            const longitude =
-                Number(longitudeInput.value);
+            const password =
+                document.getElementById("password").value;
 
 
-            if (
-                !locationReady ||
-                !Number.isFinite(latitude) ||
-                !Number.isFinite(longitude) ||
-                latitude < -90 ||
-                latitude > 90 ||
-                longitude < -180 ||
-                longitude > 180
-            ) {
+            if (!email || !password) {
 
                 event.preventDefault();
 
                 alert(
-                    "Location access is required to login."
+                    "Email and password are required."
                 );
-
-                getLocation();
-
-                return;
             }
         }
     );

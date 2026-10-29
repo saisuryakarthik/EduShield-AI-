@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduShield AI — Users</title>
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+</head>
+
+<body>
+
+<main class="login-container" style="max-width: 1100px;">
+    <section class="login-card" style="max-width: 1100px;">
+
+        <header>
+            <p
+                style="
+                    margin: 0 0 12px;
+                    color: var(--accent-light);
+                    font-family: var(--font-display);
+                    font-size: 0.72rem;
+                    font-weight: 700;
+                    letter-spacing: 0.16em;
+                    text-transform: uppercase;
+                "
+            >
+                EduShield / Administration
+            </p>
+            <h1>Users</h1>
+        </header>
+
+        <nav style="margin: 12px 0 24px; font-size: 0.85rem;">
+            <a href="/admin-dashboard">Overview</a> ·
+            <a href="/admin-users">Users</a> ·
+            <a href="/admin-assign">Assignments</a> ·
+            <a href="/logout">Sign out</a>
+        </nav>
+
+        <form method="GET" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px;">
+            <select name="role" style="padding: 8px;">
+                <option value="">All roles</option>
+                <option value="student" {% if role == "student" %}selected{% endif %}>Students</option>
+                <option value="mentor" {% if role == "mentor" %}selected{% endif %}>Mentors</option>
+                <option value="admin" {% if role == "admin" %}selected{% endif %}>Admins</option>
+            </select>
+
+            <select name="status" style="padding: 8px;">
+                <option value="">All statuses</option>
+                <option value="active" {% if status == "active" %}selected{% endif %}>Active</option>
+                <option value="pending_activation" {% if status == "pending_activation" %}selected{% endif %}>Pending activation</option>
+                <option value="disabled" {% if status == "disabled" %}selected{% endif %}>Disabled</option>
+            </select>
+
+            <input
+                type="text"
+                name="q"
+                value="{{ query }}"
+                placeholder="Search name, ID or email"
+                style="padding: 8px; flex: 1; min-width: 180px;"
+            >
+
+            <button type="submit" class="btn-primary" style="width: auto; padding: 8px 18px;">
+                Filter
+            </button>
+        </form>
+
+        {% if error %}
+            <div class="error-message" role="alert">{{ error }}</div>
+        {% endif %}
+
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
+                <thead>
+                    <tr style="text-align: left; border-bottom: 1px solid rgba(255,255,255,0.15);">
+                        <th style="padding: 8px;">ID</th>
+                        <th style="padding: 8px;">Name</th>
+                        <th style="padding: 8px;">Email</th>
+                        <th style="padding: 8px;">Role</th>
+                        <th style="padding: 8px;">Status</th>
+                        <th style="padding: 8px;">Mentor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                            <td style="padding: 8px;">{{ user.get("external_id") or user.get("user_id") }}</td>
+                            <td style="padding: 8px;">{{ user.get("name") }}</td>
+                            <td style="padding: 8px;">{{ user.get("institutional_email") or user.get("email") }}</td>
+                            <td style="padding: 8px;">{{ user.get("role") }}</td>
+                            <td style="padding: 8px;">{{ user.get("account_status") }}</td>
+                            <td style="padding: 8px;">{{ user.get("mentor_id") or "—" }}</td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="6" style="padding: 12px;" class="small-text">
+                                No users match this filter.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    </section>
+</main>
+
+</body>
+</html>

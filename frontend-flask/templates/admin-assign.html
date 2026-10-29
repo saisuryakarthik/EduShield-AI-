@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduShield AI — Assignments</title>
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+</head>
+
+<body>
+
+<main class="login-container" style="max-width: 760px;">
+    <section class="login-card" style="max-width: 760px;">
+
+        <header>
+            <p
+                style="
+                    margin: 0 0 12px;
+                    color: var(--accent-light);
+                    font-family: var(--font-display);
+                    font-size: 0.72rem;
+                    font-weight: 700;
+                    letter-spacing: 0.16em;
+                    text-transform: uppercase;
+                "
+            >
+                EduShield / Administration
+            </p>
+            <h1>Mentor assignments</h1>
+        </header>
+
+        <nav style="margin: 12px 0 24px; font-size: 0.85rem;">
+            <a href="/admin-dashboard">Overview</a> ·
+            <a href="/admin-users">Users</a> ·
+            <a href="/admin-assign">Assignments</a> ·
+            <a href="/logout">Sign out</a>
+        </nav>
+
+        {% if message %}
+            <div class="info-box" role="status">{{ message }}</div>
+        {% endif %}
+        {% if error %}
+            <div class="error-message" role="alert">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" class="login-form">
+            <input type="hidden" name="action" value="assign">
+
+            <div class="form-group">
+                <label for="assignments">
+                    Bulk assign (one per line: student_id,mentor_id)
+                </label>
+                <textarea
+                    id="assignments"
+                    name="assignments"
+                    rows="6"
+                    placeholder="24STUCHH010221,M021&#10;24STUCHH010238,M045"
+                ></textarea>
+            </div>
+
+            <button type="submit" class="btn-primary">
+                Assign mentors
+            </button>
+        </form>
+
+        <hr style="margin: 28px 0; border-color: rgba(255,255,255,0.12);">
+
+        <form method="POST" class="login-form">
+            <input type="hidden" name="action" value="unassign">
+
+            <div class="form-group">
+                <label for="student_ids">
+                    Unassign (one student_id per line)
+                </label>
+                <textarea
+                    id="student_ids"
+                    name="student_ids"
+                    rows="4"
+                    placeholder="24STUCHH010221"
+                ></textarea>
+            </div>
+
+            <button type="submit" class="btn-primary">
+                Unassign mentors
+            </button>
+        </form>
+
+    </section>
+</main>
+
+</body>
+</html>
