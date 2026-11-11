@@ -1,111 +1,304 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduShield AI — Users</title>
-    <link
-        rel="stylesheet"
-        href="{{ url_for('static', filename='style.css') }}"
-    >
+    <meta name="theme-color" content="#08080d">
+
+    <title>User Directory | EduShield AI Admin</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
-<body>
+<body class="admin-page">
 
-<main class="login-container" style="max-width: 1100px;">
-    <section class="login-card" style="max-width: 1100px;">
+    <!-- Top App Navigation Bar -->
+    <header class="app-navbar">
+        <a href="/admin-dashboard" class="app-brand">
+            <span class="brand-mark">E</span>
+            <span class="brand-copy">
+                <strong>EduShield<span class="brand-ai"> AI</span></strong>
+                <small>ADMIN SECURITY CONSOLE</small>
+            </span>
+        </a>
 
-        <header>
-            <p
-                style="
-                    margin: 0 0 12px;
-                    color: var(--accent-light);
-                    font-family: var(--font-display);
-                    font-size: 0.72rem;
-                    font-weight: 700;
-                    letter-spacing: 0.16em;
-                    text-transform: uppercase;
-                "
-            >
-                EduShield / Administration
-            </p>
-            <h1>Users</h1>
-        </header>
-
-        <nav style="margin: 12px 0 24px; font-size: 0.85rem;">
-            <a href="/admin-dashboard">Overview</a> ·
-            <a href="/admin-users">Users</a> ·
-            <a href="/admin-assign">Assignments</a> ·
-            <a href="/logout">Sign out</a>
-        </nav>
-
-        <form method="GET" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px;">
-            <select name="role" style="padding: 8px;">
-                <option value="">All roles</option>
-                <option value="student" {% if role == "student" %}selected{% endif %}>Students</option>
-                <option value="mentor" {% if role == "mentor" %}selected{% endif %}>Mentors</option>
-                <option value="admin" {% if role == "admin" %}selected{% endif %}>Admins</option>
-            </select>
-
-            <select name="status" style="padding: 8px;">
-                <option value="">All statuses</option>
-                <option value="active" {% if status == "active" %}selected{% endif %}>Active</option>
-                <option value="pending_activation" {% if status == "pending_activation" %}selected{% endif %}>Pending activation</option>
-                <option value="disabled" {% if status == "disabled" %}selected{% endif %}>Disabled</option>
-            </select>
-
-            <input
-                type="text"
-                name="q"
-                value="{{ query }}"
-                placeholder="Search name, ID or email"
-                style="padding: 8px; flex: 1; min-width: 180px;"
-            >
-
-            <button type="submit" class="btn-primary" style="width: auto; padding: 8px 18px;">
-                Filter
-            </button>
-        </form>
-
-        {% if error %}
-            <div class="error-message" role="alert">{{ error }}</div>
-        {% endif %}
-
-        <div style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
-                <thead>
-                    <tr style="text-align: left; border-bottom: 1px solid rgba(255,255,255,0.15);">
-                        <th style="padding: 8px;">ID</th>
-                        <th style="padding: 8px;">Name</th>
-                        <th style="padding: 8px;">Email</th>
-                        <th style="padding: 8px;">Role</th>
-                        <th style="padding: 8px;">Status</th>
-                        <th style="padding: 8px;">Mentor</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for user in users %}
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                            <td style="padding: 8px;">{{ user.get("external_id") or user.get("user_id") }}</td>
-                            <td style="padding: 8px;">{{ user.get("name") }}</td>
-                            <td style="padding: 8px;">{{ user.get("institutional_email") or user.get("email") }}</td>
-                            <td style="padding: 8px;">{{ user.get("role") }}</td>
-                            <td style="padding: 8px;">{{ user.get("account_status") }}</td>
-                            <td style="padding: 8px;">{{ user.get("mentor_id") or "—" }}</td>
-                        </tr>
-                    {% else %}
-                        <tr>
-                            <td colspan="6" style="padding: 12px;" class="small-text">
-                                No users match this filter.
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="navbar-right">
+            <span class="user-chip">
+                <span class="online-dot"></span>
+                {{ current_user.get('name', 'Administrator') if current_user else 'Administrator' }} · ADM
+            </span>
+            <a href="/admin-dashboard" class="button-secondary button-small" style="text-decoration: none;">
+                ◈ Dashboard Overview
+            </a>
+            <a href="/logout" class="logout-link">Sign out ↗</a>
         </div>
+    </header>
 
-    </section>
-</main>
+    <!-- Main Layout: Sidebar + Content -->
+    <div class="admin-layout">
+
+        <!-- Left Sidebar Navigation -->
+        <aside class="admin-sidebar">
+            <div>
+                <div class="admin-nav-category">
+                    <span class="admin-nav-category-dot"></span>
+                    Oversight & Navigation
+                </div>
+
+                <nav class="admin-nav-group">
+                    <a href="/admin-dashboard#overview" class="admin-nav-link">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">◈</span>
+                            <span>Overview</span>
+                        </span>
+                    </a>
+
+                    <a href="/admin-dashboard#students" class="admin-nav-link">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">🎓</span>
+                            <span>Students</span>
+                        </span>
+                    </a>
+
+                    <a href="/admin-dashboard#mentors" class="admin-nav-link">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">👔</span>
+                            <span>Mentors</span>
+                        </span>
+                    </a>
+
+                    <a href="/admin-dashboard#pending" class="admin-nav-link">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">⏳</span>
+                            <span>Pending Activation</span>
+                        </span>
+                    </a>
+
+                    <a href="/admin-dashboard#assessments" class="admin-nav-link">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">🛡️</span>
+                            <span>AI Assessments</span>
+                        </span>
+                    </a>
+
+                    <a href="/admin-dashboard#reports" class="admin-nav-link">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">📊</span>
+                            <span>Reports & Analytics</span>
+                        </span>
+                    </a>
+
+                    <a href="/admin-dashboard#activity" class="admin-nav-link">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">🕒</span>
+                            <span>Recent Activity</span>
+                        </span>
+                    </a>
+                </nav>
+
+                <div class="admin-nav-category" style="margin-top: 18px;">
+                    <span class="admin-nav-category-dot"></span>
+                    Administrative Actions
+                </div>
+
+                <nav class="admin-nav-group">
+                    <a href="/admin-assign" class="admin-nav-link">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">⚙️</span>
+                            <span>Mentor Assignments</span>
+                        </span>
+                        <span class="button-arrow" style="font-size: 0.75rem;">↗</span>
+                    </a>
+
+                    <a href="/admin-users" class="admin-nav-link active">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">👥</span>
+                            <span>Full User Directory</span>
+                        </span>
+                        <span class="admin-nav-badge">{{ users|length }}</span>
+                    </a>
+                </nav>
+            </div>
+
+            <!-- Sidebar System Card -->
+            <div class="admin-sidebar-footer">
+                <div class="admin-system-status">
+                    <span>SECURITY ENGINE</span>
+                    <span class="admin-system-indicator">
+                        <span class="online-dot"></span>
+                        ACTIVE
+                    </span>
+                </div>
+                <div style="margin-top: 8px; font-size: 0.72rem; color: var(--text-secondary); line-height: 1.5;">
+                    MySQL · Real Database Records
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="admin-main">
+
+            {% if error %}
+            <div class="dashboard-alert" role="alert" style="margin-bottom: 24px;">
+                <span>!</span>
+                <div>
+                    <strong>Filter Error</strong>
+                    <p>{{ error }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="admin-panel-card">
+                <div class="admin-panel-header">
+                    <div>
+                        <div class="eyebrow">
+                            <span class="eyebrow-dot"></span>
+                            INSTITUTIONAL DIRECTORY
+                        </div>
+                        <h2>User &amp; Identity Management<span class="heading-period">.</span></h2>
+                        <p>Search, filter, and inspect student, mentor, and administrator accounts across all departments.</p>
+                    </div>
+
+                    <a href="/admin-dashboard" class="button-secondary button-small">
+                        ← Back to Dashboard
+                    </a>
+                </div>
+
+                <!-- Server-Side Filter Form -->
+                <form method="GET" class="admin-toolbar" style="margin-bottom: 24px;">
+                    <select name="role" class="admin-select">
+                        <option value="">All Roles (Students, Mentors, Admins)</option>
+                        <option value="student" {% if role == "student" %}selected{% endif %}>Students only</option>
+                        <option value="mentor" {% if role == "mentor" %}selected{% endif %}>Mentors only</option>
+                        <option value="admin" {% if role == "admin" %}selected{% endif %}>Administrators only</option>
+                    </select>
+
+                    <select name="status" class="admin-select">
+                        <option value="">All Statuses</option>
+                        <option value="active" {% if status == "active" %}selected{% endif %}>Active accounts</option>
+                        <option value="pending_activation" {% if status == "pending_activation" %}selected{% endif %}>Pending activation</option>
+                        <option value="disabled" {% if status == "disabled" %}selected{% endif %}>Disabled accounts</option>
+                    </select>
+
+                    <input
+                        type="text"
+                        name="q"
+                        value="{{ query }}"
+                        placeholder="Search name, ID, or email..."
+                        class="admin-search-input"
+                    >
+
+                    <button type="submit" class="button-primary" style="min-height: 42px; padding: 0 20px;">
+                        Filter Records
+                    </button>
+
+                    {% if role or status or query %}
+                        <a href="/admin-users" class="button-secondary" style="min-height: 42px;">
+                            Clear Filters
+                        </a>
+                    {% endif %}
+                </form>
+
+                <!-- Users Table -->
+                <div class="admin-table-container">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>User / External ID</th>
+                                <th>Full Name</th>
+                                <th>Institutional / Primary Email</th>
+                                <th>System Role</th>
+                                <th>Account Status</th>
+                                <th>Assigned Mentor</th>
+                                <th>Department &amp; Class</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr>
+                                <td>
+                                    <span class="admin-table-id">{{ user.get("external_id") or user.get("user_id") }}</span>
+                                </td>
+                                <td>
+                                    <div class="admin-table-name">{{ user.get("name") }}</div>
+                                </td>
+                                <td>
+                                    <span>{{ user.get("institutional_email") or user.get("email") }}</span>
+                                </td>
+                                <td>
+                                    {% if user.get("role") == "admin" %}
+                                        <span class="admin-badge badge-role-admin">Administrator</span>
+                                    {% elif user.get("role") == "mentor" %}
+                                        <span class="admin-badge badge-role-mentor">Mentor</span>
+                                    {% else %}
+                                        <span class="admin-badge badge-role-student">Student</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if user.get("account_status") == "active" %}
+                                        <span class="admin-badge badge-active">
+                                            <span class="admin-badge-dot"></span>
+                                            Active
+                                        </span>
+                                    {% elif user.get("account_status") == "pending_activation" %}
+                                        <span class="admin-badge badge-pending">
+                                            <span class="admin-badge-dot"></span>
+                                            Pending
+                                        </span>
+                                    {% else %}
+                                        <span class="admin-badge badge-disabled">
+                                            <span class="admin-badge-dot"></span>
+                                            {{ user.get("account_status", "disabled") }}
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if user.get("role") == "student" %}
+                                        {% if user.get("mentor_id") %}
+                                            <span class="admin-badge badge-role-mentor">
+                                                👔 {{ user.get("mentor_id") }}
+                                            </span>
+                                        {% else %}
+                                            <span class="admin-badge badge-pending">
+                                                <span class="admin-badge-dot"></span>
+                                                Unassigned
+                                            </span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="admin-table-sub">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if user.get("department") %}
+                                        <span>{{ user.get("department") }}</span>
+                                        {% if user.get("section") or user.get("year") %}
+                                            <span class="admin-table-sub">· Sec {{ user.get("section", "-") }} · Yr {{ user.get("year", "-") }}</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="admin-table-sub">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="7" style="text-align: center; padding: 32px;" class="small-text">
+                                    No accounts match the current filter criteria.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="margin-top: 18px; display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted);">
+                    <span>Total matching records: <strong>{{ users|length }}</strong></span>
+                    <a href="/admin-assign" style="color: var(--accent-light);">Assign mentors to students ↗</a>
+                </div>
+            </div>
+
+        </main>
+    </div>
 
 </body>
 </html>

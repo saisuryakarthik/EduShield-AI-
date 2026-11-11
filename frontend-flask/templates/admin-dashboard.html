@@ -1,100 +1,1010 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduShield AI — Admin dashboard</title>
-    <link
-        rel="stylesheet"
-        href="{{ url_for('static', filename='style.css') }}"
-    >
+    <meta name="theme-color" content="#08080d">
+
+    <title>Admin Command Center | EduShield AI</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
-<body>
+<body class="admin-page">
 
-<main class="login-container" style="max-width: 960px;">
-    <section class="login-card" style="max-width: 960px;">
+    <!-- Top App Navigation Bar -->
+    <header class="app-navbar">
+        <a href="/admin-dashboard" class="app-brand">
+            <span class="brand-mark">E</span>
+            <span class="brand-copy">
+                <strong>EduShield<span class="brand-ai"> AI</span></strong>
+                <small>ADMIN SECURITY CONSOLE</small>
+            </span>
+        </a>
 
-        <header>
-            <p
-                style="
-                    margin: 0 0 12px;
-                    color: var(--accent-light);
-                    font-family: var(--font-display);
-                    font-size: 0.72rem;
-                    font-weight: 700;
-                    letter-spacing: 0.16em;
-                    text-transform: uppercase;
-                "
-            >
-                EduShield / Administration
-            </p>
-            <h1>Admin dashboard</h1>
-        </header>
-
-        <nav style="margin: 12px 0 24px; font-size: 0.85rem;">
-            <a href="/admin-dashboard">Overview</a> ·
-            <a href="/admin-users">Users</a> ·
-            <a href="/admin-assign">Assignments</a> ·
-            <a href="/logout">Sign out</a>
-        </nav>
-
-        {% if error %}
-            <div class="error-message" role="alert">{{ error }}</div>
-        {% endif %}
-
-        <div
-            style="
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                gap: 14px;
-                margin-top: 8px;
-            "
-        >
-            {% set cards = [
-                ("Students", summary.get("students_total", 0)),
-                ("Active", summary.get("students_active", 0)),
-                ("Pending activation", summary.get("students_pending", 0)),
-                ("Mentors", summary.get("mentors_total", 0)),
-                ("Unassigned students", summary.get("unassigned_students", 0)),
-                ("Open requests", summary.get("open_requests", 0))
-            ] %}
-
-            {% for label, value in cards %}
-                <div
-                    style="
-                        border: 1px solid rgba(255,255,255,0.12);
-                        border-radius: 12px;
-                        padding: 16px;
-                        text-align: center;
-                    "
-                >
-                    <div style="font-size: 1.8rem; font-weight: 700;">
-                        {{ value }}
-                    </div>
-                    <div class="small-text">{{ label }}</div>
-                </div>
-            {% endfor %}
+        <div class="navbar-right">
+            <span class="user-chip">
+                <span class="online-dot"></span>
+                {{ current_user.get('name', 'Administrator') }} · ADM
+            </span>
+            <a href="/admin-dashboard" class="button-secondary button-small" style="text-decoration: none;">
+                ◈ Overview
+            </a>
+            <a href="/logout" class="logout-link">Sign out ↗</a>
         </div>
+    </header>
 
-        <h2 style="margin-top: 28px; font-size: 1rem;">Last SIS import</h2>
+    <!-- Main Layout: Sidebar + Content -->
+    <div class="admin-layout">
 
-        {% if summary.get("last_import") %}
-            <div class="small-text" style="line-height: 1.7;">
-                Run {{ summary["last_import"].get("run_id") }} ·
-                students read {{ summary["last_import"].get("students_read", 0) }},
-                created {{ summary["last_import"].get("students_created", 0) }},
-                updated {{ summary["last_import"].get("students_updated", 0) }} ·
-                mentors created {{ summary["last_import"].get("mentors_created", 0) }} ·
-                assignments {{ summary["last_import"].get("assignments_created", 0) }} ·
-                unassigned {{ summary["last_import"].get("unassigned", 0) }}
+        <!-- Left Sidebar Navigation -->
+        <aside class="admin-sidebar" id="adminSidebar">
+            <div>
+                <div class="admin-nav-category">
+                    <span class="admin-nav-category-dot"></span>
+                    Oversight & Navigation
+                </div>
+
+                <nav class="admin-nav-group">
+                    <a href="#overview" class="admin-nav-link active" data-target="overview">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">◈</span>
+                            <span>Overview</span>
+                        </span>
+                        <span class="admin-nav-badge">Live</span>
+                    </a>
+
+                    <a href="#students" class="admin-nav-link" data-target="students">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">🎓</span>
+                            <span>Students</span>
+                        </span>
+                        <span class="admin-nav-badge">{{ summary.get('students_total', users|selectattr('role', 'equalto', 'student')|list|length) }}</span>
+                    </a>
+
+                    <a href="#mentors" class="admin-nav-link" data-target="mentors">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">👔</span>
+                            <span>Mentors</span>
+                        </span>
+                        <span class="admin-nav-badge">{{ summary.get('mentors_total', users|selectattr('role', 'equalto', 'mentor')|list|length) }}</span>
+                    </a>
+
+                    <a href="#pending" class="admin-nav-link" data-target="pending">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">⏳</span>
+                            <span>Pending Activation</span>
+                        </span>
+                        <span class="admin-nav-badge">{{ summary.get('students_pending', 0) }}</span>
+                    </a>
+
+                    <a href="#assessments" class="admin-nav-link" data-target="assessments">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">🛡️</span>
+                            <span>AI Assessments</span>
+                        </span>
+                        <span class="admin-nav-badge">{{ requests|length }}</span>
+                    </a>
+
+                    <a href="#reports" class="admin-nav-link" data-target="reports">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">📊</span>
+                            <span>Reports & Analytics</span>
+                        </span>
+                    </a>
+
+                    <a href="#activity" class="admin-nav-link" data-target="activity">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">🕒</span>
+                            <span>Recent Activity</span>
+                        </span>
+                    </a>
+                </nav>
+
+                <div class="admin-nav-category" style="margin-top: 18px;">
+                    <span class="admin-nav-category-dot"></span>
+                    Administrative Actions
+                </div>
+
+                <nav class="admin-nav-group">
+                    <a href="/admin-assign" class="admin-nav-link">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">⚙️</span>
+                            <span>Mentor Assignments</span>
+                        </span>
+                        <span class="button-arrow" style="font-size: 0.75rem;">↗</span>
+                    </a>
+
+                    <a href="/admin-users" class="admin-nav-link">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">👥</span>
+                            <span>Full User Directory</span>
+                        </span>
+                        <span class="button-arrow" style="font-size: 0.75rem;">↗</span>
+                    </a>
+                </nav>
             </div>
-        {% else %}
-            <div class="small-text">No import runs recorded yet.</div>
-        {% endif %}
 
-    </section>
-</main>
+            <!-- Sidebar System Card -->
+            <div class="admin-sidebar-footer">
+                <div class="admin-system-status">
+                    <span>SECURITY ENGINE</span>
+                    <span class="admin-system-indicator">
+                        <span class="online-dot"></span>
+                        ACTIVE
+                    </span>
+                </div>
+                <div style="margin-top: 8px; font-size: 0.72rem; color: var(--text-secondary); line-height: 1.5;">
+                    MySQL · Dual Parent OTP · AI Model v1 (LR)
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Dashboard Content -->
+        <main class="admin-main">
+
+            {% if error %}
+            <div class="dashboard-alert" role="alert" style="margin-bottom: 24px;">
+                <span>!</span>
+                <div>
+                    <strong>Connection Alert</strong>
+                    <p>{{ error }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- SECTION 1: OVERVIEW & HERO BANNER -->
+            <section id="overview" class="admin-section">
+
+                <!-- Hero Banner -->
+                <div class="admin-hero">
+                    <div class="admin-hero-copy">
+                        <div class="eyebrow">
+                            <span class="eyebrow-dot"></span>
+                            INSTITUTIONAL SECURITY COMMAND CENTER
+                        </div>
+
+                        <h1>Unified Identity<br><span>Protection & Control.</span></h1>
+
+                        <p>
+                            Real-time oversight for student identity modifications, automated AI fraud evaluations,
+                            and institutional mentor allocations across departments.
+                        </p>
+
+                        <div class="admin-hero-actions">
+                            <a href="/admin-assign" class="button-primary">
+                                <span>⚙</span> Bulk Assign Mentors
+                                <span class="button-arrow">↗</span>
+                            </a>
+                            <a href="/admin-users" class="button-secondary">
+                                <span>👥</span> Filter All Users
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Right art card -->
+                    <div class="admin-hero-badge" aria-hidden="true">
+                        <span class="admin-hero-badge-title">SYSTEM AUDIT METRICS</span>
+                        <span class="admin-hero-badge-value">
+                            <span class="online-dot"></span>
+                            {{ requests|length }} Security Audits
+                        </span>
+                        <div style="font-size: 0.72rem; color: var(--text-secondary); line-height: 1.5;">
+                            {{ users|length }} Total Accounts · {{ summary.get("students_active", 0) }} Active Students · {{ summary.get("mentors_total", 0) }} Faculty Mentors
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Overview Statistics Cards -->
+                <div class="admin-stats-grid" aria-label="System overview statistics">
+
+                    <!-- Total Students -->
+                    <article class="admin-stat-card">
+                        <div class="admin-stat-top">
+                            <span class="admin-stat-icon-wrapper violet-icon">◈</span>
+                            <span class="admin-stat-label">TOTAL STUDENTS</span>
+                        </div>
+                        <strong class="admin-stat-value">
+                            {{ summary.get("students_total", users|selectattr('role', 'equalto', 'student')|list|length) }}
+                        </strong>
+                        <span class="admin-stat-subtext">Registered in SIS system</span>
+                    </article>
+
+                    <!-- Active Students -->
+                    <article class="admin-stat-card">
+                        <div class="admin-stat-top">
+                            <span class="admin-stat-icon-wrapper green-icon">✓</span>
+                            <span class="admin-stat-label">ACTIVE STUDENTS</span>
+                        </div>
+                        <strong class="admin-stat-value">
+                            {{ summary.get("students_active", 0) }}
+                        </strong>
+                        <span class="admin-stat-subtext">Activated & login enabled</span>
+                    </article>
+
+                    <!-- Pending Activation -->
+                    <article class="admin-stat-card">
+                        <div class="admin-stat-top">
+                            <span class="admin-stat-icon-wrapper amber-icon">⏳</span>
+                            <span class="admin-stat-label">PENDING ACTIVATION</span>
+                        </div>
+                        <strong class="admin-stat-value">
+                            {{ summary.get("students_pending", 0) }}
+                        </strong>
+                        <span class="admin-stat-subtext">Awaiting self-activation at /activate</span>
+                    </article>
+
+                    <!-- Faculty Mentors -->
+                    <article class="admin-stat-card">
+                        <div class="admin-stat-top">
+                            <span class="admin-stat-icon-wrapper blue-icon">👔</span>
+                            <span class="admin-stat-label">FACULTY MENTORS</span>
+                        </div>
+                        <strong class="admin-stat-value">
+                            {{ summary.get("mentors_total", users|selectattr('role', 'equalto', 'mentor')|list|length) }}
+                        </strong>
+                        <span class="admin-stat-subtext">Faculty review leads</span>
+                    </article>
+
+                    <!-- Open Requests -->
+                    <article class="admin-stat-card">
+                        <div class="admin-stat-top">
+                            <span class="admin-stat-icon-wrapper amber-icon" style="color: #fb7185; background: rgba(251, 113, 133, 0.12);">⚡</span>
+                            <span class="admin-stat-label">OPEN REQUESTS</span>
+                        </div>
+                        <strong class="admin-stat-value">
+                            {{ summary.get("open_requests", 0) }}
+                        </strong>
+                        <span class="admin-stat-subtext">Pending verification or review</span>
+                    </article>
+
+                    <!-- Unassigned Students -->
+                    <article class="admin-stat-card">
+                        <div class="admin-stat-top">
+                            <span class="admin-stat-icon-wrapper amber-icon" style="color: #fbbf24; background: rgba(251, 191, 36, 0.12);">⚠</span>
+                            <span class="admin-stat-label">UNASSIGNED STUDENTS</span>
+                        </div>
+                        <strong class="admin-stat-value">
+                            {{ summary.get("unassigned_students", 0) }}
+                        </strong>
+                        <span class="admin-stat-subtext">Require faculty mentor mapping</span>
+                    </article>
+
+                    <!-- AI Risk Assessments -->
+                    <article class="admin-stat-card">
+                        <div class="admin-stat-top">
+                            <span class="admin-stat-icon-wrapper violet-icon">🛡️</span>
+                            <span class="admin-stat-label">ASSESSMENTS RUN</span>
+                        </div>
+                        <strong class="admin-stat-value">
+                            {{ requests|selectattr('risk_score', 'ne', none)|list|length }}
+                        </strong>
+                        <span class="admin-stat-subtext">Processed by AI risk model</span>
+                    </article>
+
+                    <!-- High Risk Flags -->
+                    <article class="admin-stat-card">
+                        <div class="admin-stat-top">
+                            <span class="admin-stat-icon-wrapper" style="color: #fda4af; background: rgba(239, 68, 68, 0.14);">🚨</span>
+                            <span class="admin-stat-label">HIGH RISK FLAGS</span>
+                        </div>
+                        <strong class="admin-stat-value">
+                            {{ requests|selectattr('risk_level', 'equalto', 'HIGH')|list|length }}
+                        </strong>
+                        <span class="admin-stat-subtext">Risk score &gt; 50% threshold</span>
+                    </article>
+
+                </div>
+
+            </section>
+
+
+            <!-- SECTION 2: STUDENT MANAGEMENT -->
+            <section id="students" class="admin-panel-card admin-section">
+                <div class="admin-panel-header">
+                    <div>
+                        <div class="eyebrow">
+                            <span class="eyebrow-dot"></span>
+                            STUDENT MANAGEMENT
+                        </div>
+                        <h2>Student Directory & Allocations<span class="heading-period">.</span></h2>
+                        <p>Browse institutional student records, track account activation status, and inspect mentor allocations.</p>
+                    </div>
+
+                    <div class="admin-toolbar">
+                        <input
+                            type="text"
+                            id="studentSearch"
+                            class="admin-search-input"
+                            placeholder="Search student name, ID, or email..."
+                            oninput="filterStudents()"
+                        >
+
+                        <select id="studentDeptFilter" class="admin-select" onchange="filterStudents()">
+                            <option value="">All Departments</option>
+                            <option value="Computer Science">Computer Science</option>
+                            <option value="Electronics">Electronics</option>
+                            <option value="Mechanical">Mechanical</option>
+                        </select>
+
+                        <select id="studentStatusFilter" class="admin-select" onchange="filterStudents()">
+                            <option value="">All Statuses</option>
+                            <option value="active">Active</option>
+                            <option value="pending_activation">Pending Activation</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="admin-table-container">
+                    <table class="admin-table" id="studentTable">
+                        <thead>
+                            <tr>
+                                <th>Student ID</th>
+                                <th>Student Name</th>
+                                <th>Institutional Email</th>
+                                <th>Department & Class</th>
+                                <th>Assigned Mentor</th>
+                                <th>Account Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set student_list = users|selectattr('role', 'equalto', 'student')|list %}
+                            {% for student in student_list %}
+                            <tr class="student-row"
+                                data-name="{{ student.get('name', '')|lower }}"
+                                data-id="{{ (student.get('external_id') or student.get('user_id', ''))|lower }}"
+                                data-email="{{ (student.get('institutional_email') or student.get('email', ''))|lower }}"
+                                data-dept="{{ student.get('department', '') }}"
+                                data-status="{{ student.get('account_status', '') }}"
+                            >
+                                <td>
+                                    <span class="admin-table-id">{{ student.get('external_id') or student.get('user_id') }}</span>
+                                </td>
+                                <td>
+                                    <div class="admin-table-name">{{ student.get('name') }}</div>
+                                </td>
+                                <td>
+                                    <span>{{ student.get('institutional_email') or student.get('email') }}</span>
+                                </td>
+                                <td>
+                                    {% if student.get('department') %}
+                                        <span>{{ student.get('department') }}</span>
+                                        {% if student.get('section') or student.get('year') %}
+                                            <span class="admin-table-sub">· Sec {{ student.get('section', '-') }} · Yr {{ student.get('year', '-') }}</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="admin-table-sub">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if student.get('mentor_id') %}
+                                        <span class="admin-badge badge-role-mentor">
+                                            👔 {{ student.get('mentor_id') }}
+                                        </span>
+                                    {% else %}
+                                        <span class="admin-badge badge-pending">
+                                            <span class="admin-badge-dot"></span>
+                                            Unassigned
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if student.get('account_status') == 'active' %}
+                                        <span class="admin-badge badge-active">
+                                            <span class="admin-badge-dot"></span>
+                                            Active
+                                        </span>
+                                    {% elif student.get('account_status') == 'pending_activation' %}
+                                        <span class="admin-badge badge-pending">
+                                            <span class="admin-badge-dot"></span>
+                                            Pending
+                                        </span>
+                                    {% else %}
+                                        <span class="admin-badge badge-disabled">
+                                            <span class="admin-badge-dot"></span>
+                                            {{ student.get('account_status', 'Unknown') }}
+                                        </span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 28px;" class="small-text">
+                                    No student records found in the database.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="margin-top: 14px; display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; color: var(--text-muted);">
+                    <span id="studentCountLabel">Showing {{ student_list|length }} students</span>
+                    <a href="/admin-users?role=student" style="color: var(--accent-light);">Advanced user filter ↗</a>
+                </div>
+            </section>
+
+
+            <!-- SECTION 3: MENTOR MANAGEMENT -->
+            <section id="mentors" class="admin-panel-card admin-section">
+                <div class="admin-panel-header">
+                    <div>
+                        <div class="eyebrow">
+                            <span class="eyebrow-dot"></span>
+                            MENTOR MANAGEMENT
+                        </div>
+                        <h2>Faculty Mentors & Workloads<span class="heading-period">.</span></h2>
+                        <p>Faculty mentors authorised to review and approve phone change requests for their designated students.</p>
+                    </div>
+
+                    <a href="/admin-assign" class="button-primary button-small">
+                        <span>＋</span> Manage Allocations ↗
+                    </a>
+                </div>
+
+                <div class="admin-mentor-grid">
+                    {% set mentor_list = users|selectattr('role', 'equalto', 'mentor')|list %}
+                    {% for mentor in mentor_list %}
+                        {% set assigned_students = users|selectattr('mentor_id', 'equalto', mentor.get('user_id'))|list %}
+                        <article class="admin-mentor-card">
+                            <div>
+                                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;">
+                                    <div>
+                                        <span class="eyebrow" style="margin-bottom: 4px;">FACULTY MENTOR</span>
+                                        <h3 style="margin: 0; font: 600 1.15rem var(--font-display); color: #ffffff;">
+                                            {{ mentor.get('name') }}
+                                        </h3>
+                                    </div>
+                                    <span class="admin-table-id" style="padding: 4px 8px; border-radius: 8px; background: rgba(139, 92, 246, 0.12); color: var(--accent-light);">
+                                        {{ mentor.get('user_id') }}
+                                    </span>
+                                </div>
+
+                                <div style="margin-top: 14px; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.6;">
+                                    <div><strong>Email:</strong> {{ mentor.get('institutional_email') or mentor.get('email') }}</div>
+                                    <div><strong>Department:</strong> {{ mentor.get('department') or 'General / Cross-Departmental' }}</div>
+                                </div>
+                            </div>
+
+                            <div style="padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.06); display: flex; align-items: center; justify-content: space-between;">
+                                <div>
+                                    <div class="small-text">Assigned Students</div>
+                                    <div style="font-weight: 700; font-size: 1.1rem; color: #ffffff;">
+                                        {{ assigned_students|length }} students
+                                    </div>
+                                </div>
+
+                                <div>
+                                    {% if mentor.get('account_status') == 'active' %}
+                                        <span class="admin-badge badge-active">
+                                            <span class="admin-badge-dot"></span> Active
+                                        </span>
+                                    {% else %}
+                                        <span class="admin-badge badge-pending">
+                                            <span class="admin-badge-dot"></span> Pending
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </article>
+                    {% else %}
+                        <div style="grid-column: 1 / -1; padding: 28px; text-align: center; color: var(--text-muted);">
+                            No mentors recorded in the database.
+                        </div>
+                    {% endfor %}
+                </div>
+            </section>
+
+
+            <!-- SECTION 4: PENDING ACTIVATIONS -->
+            <section id="pending" class="admin-panel-card admin-section">
+                <div class="admin-panel-header">
+                    <div>
+                        <div class="eyebrow">
+                            <span class="eyebrow-dot"></span>
+                            ONBOARDING QUEUE
+                        </div>
+                        <h2>Pending Account Activations<span class="heading-period">.</span></h2>
+                        <p>Accounts imported from SIS files that have not yet set their password via the 6-digit email OTP flow.</p>
+                    </div>
+
+                    <a href="/activate" class="button-secondary button-small" target="_blank">
+                        <span>↗</span> Open /activate Page
+                    </a>
+                </div>
+
+                <div class="dashboard-alert" style="margin-bottom: 20px; background: rgba(139, 92, 246, 0.08); border-color: rgba(167, 139, 250, 0.25);">
+                    <span style="background: rgba(139, 92, 246, 0.2); color: var(--accent-light);">ℹ</span>
+                    <div>
+                        <strong style="color: #ffffff;">Activation Security Notice</strong>
+                        <p style="color: var(--text-secondary); margin: 4px 0 0;">
+                            Imported users must visit <code>/activate</code>, input their Student or Mentor ID, receive a 6-digit OTP to their institutional email, and define their password (minimum 8 characters). Unactivated accounts are refused login with HTTP 403.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="admin-table-container">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>External / User ID</th>
+                                <th>Name</th>
+                                <th>Role</th>
+                                <th>Institutional Email</th>
+                                <th>Department</th>
+                                <th>Quick Test Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set pending_users = users|selectattr('account_status', 'equalto', 'pending_activation')|list %}
+                            {% for pu in pending_users %}
+                            <tr>
+                                <td>
+                                    <span class="admin-table-id">{{ pu.get('external_id') or pu.get('user_id') }}</span>
+                                </td>
+                                <td>
+                                    <strong style="color: #ffffff;">{{ pu.get('name') }}</strong>
+                                </td>
+                                <td>
+                                    {% if pu.get('role') == 'mentor' %}
+                                        <span class="admin-badge badge-role-mentor">Mentor</span>
+                                    {% else %}
+                                        <span class="admin-badge badge-role-student">Student</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span>{{ pu.get('institutional_email') or pu.get('email') }}</span>
+                                </td>
+                                <td>
+                                    <span>{{ pu.get('department') or '—' }}</span>
+                                </td>
+                                <td>
+                                    <button
+                                        type="button"
+                                        class="button-secondary button-small"
+                                        onclick="copyIdToClipboard('{{ pu.get('external_id') or pu.get('user_id') }}')"
+                                        title="Copy ID to activate at /activate"
+                                    >
+                                        Copy ID
+                                    </button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 28px; color: var(--text-muted);">
+                                    All accounts are currently active. No pending activations in queue.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+
+            <!-- SECTION 5: ASSESSMENT MANAGEMENT -->
+            <section id="assessments" class="admin-panel-card admin-section">
+                <div class="admin-panel-header">
+                    <div>
+                        <div class="eyebrow">
+                            <span class="eyebrow-dot"></span>
+                            AI RISK ENGINE OVERSIGHT
+                        </div>
+                        <h2>Phone Change Fraud Risk Assessments<span class="heading-period">.</span></h2>
+                        <p>Real-time AI anomaly detection evaluating location deviation, device history, frequency of changes, and dual-parent verification.</p>
+                    </div>
+
+                    <div style="display: flex; gap: 8px;">
+                        <span class="admin-badge risk-pill-high">
+                            High Risk: {{ requests|selectattr('risk_level', 'equalto', 'HIGH')|list|length }}
+                        </span>
+                        <span class="admin-badge risk-pill-medium">
+                            Medium: {{ requests|selectattr('risk_level', 'equalto', 'MEDIUM')|list|length }}
+                        </span>
+                        <span class="admin-badge risk-pill-low">
+                            Low: {{ requests|selectattr('risk_level', 'equalto', 'LOW')|list|length }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="admin-table-container">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Request ID</th>
+                                <th>Student ID</th>
+                                <th>Number Change</th>
+                                <th>Parent Verification</th>
+                                <th>AI Risk Score</th>
+                                <th>Risk Factors</th>
+                                <th>Request Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in requests %}
+                            <tr id="req-row-{{ req.get('request_id') }}">
+                                <td>
+                                    <span class="admin-table-id">{{ req.get('request_id') }}</span>
+                                    <div class="admin-table-sub">{{ req.get('requested_at', '')[:10] }}</div>
+                                </td>
+                                <td>
+                                    <strong style="color: #ffffff;">{{ req.get('user_id') }}</strong>
+                                </td>
+                                <td>
+                                    <span style="color: var(--text-muted); font-size: 0.78rem;">{{ req.get('old_phone') }}</span>
+                                    <span style="color: var(--accent-light); margin: 0 4px;">→</span>
+                                    <strong style="color: #ffffff; font-size: 0.84rem;">{{ req.get('new_phone') }}</strong>
+                                </td>
+                                <td>
+                                    {% if req.get('auth_status') == 'VERIFIED' or req.get('parent_verification_status') == 'VERIFIED' %}
+                                        <span class="admin-badge badge-active">
+                                            <span class="admin-badge-dot"></span>
+                                            Verified
+                                        </span>
+                                    {% else %}
+                                        <span class="admin-badge badge-pending">
+                                            <span class="admin-badge-dot"></span>
+                                            Pending
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if req.get('risk_score') is not none %}
+                                        {% if req.get('risk_level') == 'HIGH' %}
+                                            <span class="admin-badge risk-pill-high">
+                                                🚨 {{ req.get('risk_score') }}% HIGH
+                                            </span>
+                                        {% elif req.get('risk_level') == 'MEDIUM' %}
+                                            <span class="admin-badge risk-pill-medium">
+                                                ⚠ {{ req.get('risk_score') }}% MED
+                                            </span>
+                                        {% else %}
+                                            <span class="admin-badge risk-pill-low">
+                                                ✓ {{ req.get('risk_score') }}% LOW
+                                            </span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="admin-table-sub">Awaiting verification</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if req.get('risk_factors') %}
+                                        {% if req.get('risk_factors') is iterable and req.get('risk_factors') is not string %}
+                                            {% for rf in req.get('risk_factors') %}
+                                                <span class="risk-factor-tag">{{ rf }}</span>
+                                            {% endfor %}
+                                        {% else %}
+                                            <span class="risk-factor-tag">{{ req.get('risk_factors') }}</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="admin-table-sub">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if req.get('status') == 'APPROVED' %}
+                                        <span class="admin-badge badge-active">Approved</span>
+                                    {% elif req.get('status') == 'REJECTED' %}
+                                        <span class="admin-badge badge-rejected">Rejected</span>
+                                    {% elif req.get('status') == 'CANCELLED' %}
+                                        <span class="admin-badge" style="background: rgba(255,255,255,0.05); color: var(--text-muted);">Cancelled</span>
+                                    {% elif req.get('status') == 'SECURITY_HOLD' %}
+                                        <span class="admin-badge badge-rejected">Security Hold</span>
+                                    {% else %}
+                                        <span class="admin-badge badge-pending">Pending</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if req.get('auth_status') == 'VERIFIED' %}
+                                        <button
+                                            type="button"
+                                            class="button-secondary button-small"
+                                            onclick="retryAssessment('{{ req.get('request_id') }}')"
+                                        >
+                                            Retry AI
+                                        </button>
+                                    {% else %}
+                                        <span class="admin-table-sub" title="Parent OTP verification must complete first">Requires OTP</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="8" style="text-align: center; padding: 28px; color: var(--text-muted);">
+                                    No phone change requests recorded.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+
+            <!-- SECTION 6: REPORTS & ANALYTICS -->
+            <section id="reports" class="admin-panel-card admin-section">
+                <div class="admin-panel-header">
+                    <div>
+                        <div class="eyebrow">
+                            <span class="eyebrow-dot"></span>
+                            AUDIT LEDGER & ANALYTICS
+                        </div>
+                        <h2>System Metrics & SIS Import Report<span class="heading-period">.</span></h2>
+                        <p>Complete historical ledger of SIS onboarding syncs, risk distributions, and verification compliance.</p>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+
+                    <!-- SIS Import Card -->
+                    <div style="padding: 22px; border-radius: 18px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border);">
+                        <span class="eyebrow" style="margin-bottom: 8px;">LATEST SIS IMPORT RUN</span>
+                        {% set imp = summary.get("last_import") %}
+                        {% if imp %}
+                            <h3 style="margin: 0 0 14px; font: 700 1.3rem var(--font-display); color: #ffffff;">
+                                Run #{{ imp.get("run_id") }} · Success
+                            </h3>
+                            <div style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.8;">
+                                <div><strong>Completed at:</strong> {{ imp.get("finished_at") }}</div>
+                                <div><strong>Students processed:</strong> {{ imp.get("students_read", 0) }} read ({{ imp.get("students_created", 0) }} created, {{ imp.get("students_updated", 0) }} updated)</div>
+                                <div><strong>Mentors processed:</strong> {{ imp.get("mentors_created", 0) }} created ({{ imp.get("mentors_updated", 0) }} updated)</div>
+                                <div><strong>Assignments mapped:</strong> {{ imp.get("assignments_created", 0) }} new, {{ imp.get("assignments_updated", 0) }} updated</div>
+                                <div><strong>Unassigned:</strong> {{ imp.get("unassigned", 0) }} students</div>
+                            </div>
+                        {% else %}
+                            <p style="color: var(--text-muted); font-size: 0.85rem; margin: 12px 0 0;">
+                                No SIS batch import runs recorded yet.
+                            </p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Risk Distribution Card -->
+                    <div style="padding: 22px; border-radius: 18px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border);">
+                        <span class="eyebrow" style="margin-bottom: 8px;">FRAUD RISK DISTRIBUTION</span>
+                        <h3 style="margin: 0 0 14px; font: 700 1.3rem var(--font-display); color: #ffffff;">
+                            AI Anomaly Assessment Ratio
+                        </h3>
+
+                        {% set high_c = requests|selectattr('risk_level', 'equalto', 'HIGH')|list|length %}
+                        {% set med_c = requests|selectattr('risk_level', 'equalto', 'MEDIUM')|list|length %}
+                        {% set low_c = requests|selectattr('risk_level', 'equalto', 'LOW')|list|length %}
+                        {% set total_assessed = high_c + med_c + low_c %}
+
+                        <div class="analytics-bar-wrapper">
+                            {% if total_assessed > 0 %}
+                                <div class="analytics-bar-fill bar-red" style="width: {{ (high_c / total_assessed * 100)|round }}%;" title="High Risk: {{ high_c }}"></div>
+                                <div class="analytics-bar-fill bar-amber" style="width: {{ (med_c / total_assessed * 100)|round }}%;" title="Medium Risk: {{ med_c }}"></div>
+                                <div class="analytics-bar-fill bar-green" style="width: {{ (low_c / total_assessed * 100)|round }}%;" title="Low Risk: {{ low_c }}"></div>
+                            {% else %}
+                                <div class="analytics-bar-fill" style="width: 100%; background: rgba(255,255,255,0.1);"></div>
+                            {% endif %}
+                        </div>
+
+                        <div style="margin-top: 14px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 0.78rem;">
+                            <div>
+                                <span style="color: #fda4af;">● High Risk</span>
+                                <strong style="display: block; color: #ffffff; font-size: 1rem; margin-top: 4px;">{{ high_c }}</strong>
+                            </div>
+                            <div>
+                                <span style="color: #fcd34d;">● Medium</span>
+                                <strong style="display: block; color: #ffffff; font-size: 1rem; margin-top: 4px;">{{ med_c }}</strong>
+                            </div>
+                            <div>
+                                <span style="color: #6ee7b7;">● Low Risk</span>
+                                <strong style="display: block; color: #ffffff; font-size: 1rem; margin-top: 4px;">{{ low_c }}</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Security Protocol Card -->
+                    <div style="padding: 22px; border-radius: 18px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border);">
+                        <span class="eyebrow" style="margin-bottom: 8px;">SECURITY INVARIANTS</span>
+                        <h3 style="margin: 0 0 14px; font: 700 1.3rem var(--font-display); color: #ffffff;">
+                            Active Defense Protocols
+                        </h3>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.8;">
+                            <div><span style="color: #34d399;">✓</span> <strong>Dual Parent Verification:</strong> SMS + Email OTP mandatory</div>
+                            <div><span style="color: #34d399;">✓</span> <strong>Peppered HMAC:</strong> Secrets not stored plain in DB</div>
+                            <div><span style="color: #34d399;">✓</span> <strong>Token Revocation:</strong> Persistent across server restarts</div>
+                            <div><span style="color: #34d399;">✓</span> <strong>Rate Limiting:</strong> IP &amp; account-level brute force lock</div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+
+            <!-- SECTION 7: RECENT ACTIVITY -->
+            <section id="activity" class="admin-panel-card admin-section">
+                <div class="admin-panel-header">
+                    <div>
+                        <div class="eyebrow">
+                            <span class="eyebrow-dot"></span>
+                            CHRONOLOGICAL AUDIT STREAM
+                        </div>
+                        <h2>Recent System Activity<span class="heading-period">.</span></h2>
+                        <p>Real-time timeline of identity events, phone update submissions, and approval status changes.</p>
+                    </div>
+                </div>
+
+                <div class="admin-timeline">
+                    {% for req in requests[:8] %}
+                    <div class="admin-timeline-item">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <strong style="color: #ffffff; font-size: 0.9rem;">{{ req.get('user_id') }}</strong>
+                                <span class="admin-table-sub">submitted request {{ req.get('request_id') }}</span>
+                            </div>
+                            <div style="margin-top: 5px; font-size: 0.8rem; color: var(--text-secondary);">
+                                Change from <code style="color: var(--text-muted);">{{ req.get('old_phone') }}</code> to <code style="color: var(--accent-light);">{{ req.get('new_phone') }}</code>
+                                · Mentor: <strong>{{ req.get('mentor_id') or 'Unassigned' }}</strong>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            {% if req.get('risk_level') %}
+                                <span class="admin-badge risk-pill-{{ req.get('risk_level')|lower }}">
+                                    Risk: {{ req.get('risk_score') }}%
+                                </span>
+                            {% endif %}
+
+                            {% if req.get('status') == 'APPROVED' %}
+                                <span class="admin-badge badge-active">Approved</span>
+                            {% elif req.get('status') == 'CANCELLED' %}
+                                <span class="admin-badge" style="background: rgba(255,255,255,0.05); color: var(--text-muted);">Cancelled</span>
+                            {% elif req.get('status') == 'REJECTED' %}
+                                <span class="admin-badge badge-rejected">Rejected</span>
+                            {% else %}
+                                <span class="admin-badge badge-pending">Pending</span>
+                            {% endif %}
+
+                            <span class="admin-table-sub">{{ req.get('requested_at', '')[:10] }}</span>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div style="color: var(--text-muted); font-size: 0.85rem; padding: 16px;">
+                        No recent activity recorded.
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Toast Notification for Asynchronous Actions -->
+    <div id="adminToast" class="admin-toast" role="status" aria-live="polite">
+        <span id="toastIcon">✓</span>
+        <span id="toastMessage">Action completed successfully.</span>
+    </div>
+
+    <!-- Client-side Interactive Functionality -->
+    <script>
+        // Interactive Client-Side Filter for Student Directory
+        function filterStudents() {
+            const query = (document.getElementById('studentSearch').value || '').trim().toLowerCase();
+            const dept = document.getElementById('studentDeptFilter').value;
+            const status = document.getElementById('studentStatusFilter').value;
+
+            const rows = document.querySelectorAll('.student-row');
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const name = row.getAttribute('data-name') || '';
+                const id = row.getAttribute('data-id') || '';
+                const email = row.getAttribute('data-email') || '';
+                const rDept = row.getAttribute('data-dept') || '';
+                const rStatus = row.getAttribute('data-status') || '';
+
+                const matchesQuery = !query || name.includes(query) || id.includes(query) || email.includes(query);
+                const matchesDept = !dept || rDept === dept;
+                const matchesStatus = !status || rStatus === status;
+
+                if (matchesQuery && matchesDept && matchesStatus) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            const countLabel = document.getElementById('studentCountLabel');
+            if (countLabel) {
+                countLabel.textContent = `Showing ${visibleCount} student${visibleCount === 1 ? '' : 's'}`;
+            }
+        }
+
+        // Copy ID to clipboard
+        function copyIdToClipboard(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast('✓ ID copied to clipboard: ' + text);
+                }).catch(() => {
+                    fallbackCopy(text);
+                });
+            } else {
+                fallbackCopy(text);
+            }
+        }
+
+        function fallbackCopy(text) {
+            const temp = document.createElement('textarea');
+            temp.value = text;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+            showToast('✓ ID copied: ' + text);
+        }
+
+        // Asynchronous AI Assessment Retry
+        function retryAssessment(requestId) {
+            showToast('⏳ Triggering AI risk assessment retry...', false);
+
+            fetch(`/admin/retry-assessment/${requestId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('✓ AI assessment regenerated successfully!');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1200);
+                } else {
+                    showToast('⚠ ' + (data.message || 'Retry failed'), true);
+                }
+            })
+            .catch(err => {
+                showToast('⚠ Failed to connect to server', true);
+            });
+        }
+
+        // Toast Helper
+        function showToast(message, isError) {
+            const toast = document.getElementById('adminToast');
+            const msgEl = document.getElementById('toastMessage');
+            const iconEl = document.getElementById('toastIcon');
+
+            if (!toast || !msgEl) return;
+
+            msgEl.textContent = message;
+            iconEl.textContent = isError ? '⚠' : '✓';
+            toast.style.borderColor = isError ? 'rgba(251, 113, 133, 0.4)' : 'rgba(167, 139, 250, 0.35)';
+
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3200);
+        }
+
+        // Active link switching on sidebar scroll
+        document.addEventListener('DOMContentLoaded', () => {
+            const links = document.querySelectorAll('.admin-nav-link[data-target]');
+            const sections = document.querySelectorAll('.admin-section');
+
+            window.addEventListener('scroll', () => {
+                let current = '';
+                sections.forEach(section => {
+                    const top = section.offsetTop - 120;
+                    if (window.pageYOffset >= top) {
+                        current = section.getAttribute('id');
+                    }
+                });
+
+                links.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('data-target') === current) {
+                        link.classList.add('active');
+                    }
+                });
+            });
+        });
+    </script>
 
 </body>
 </html>

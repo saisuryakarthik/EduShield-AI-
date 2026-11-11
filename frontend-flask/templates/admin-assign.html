@@ -1,95 +1,268 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduShield AI — Assignments</title>
-    <link
-        rel="stylesheet"
-        href="{{ url_for('static', filename='style.css') }}"
-    >
+    <meta name="theme-color" content="#08080d">
+
+    <title>Mentor Allocations | EduShield AI Admin</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
-<body>
+<body class="admin-page">
 
-<main class="login-container" style="max-width: 760px;">
-    <section class="login-card" style="max-width: 760px;">
+    <!-- Top App Navigation Bar -->
+    <header class="app-navbar">
+        <a href="/admin-dashboard" class="app-brand">
+            <span class="brand-mark">E</span>
+            <span class="brand-copy">
+                <strong>EduShield<span class="brand-ai"> AI</span></strong>
+                <small>ADMIN SECURITY CONSOLE</small>
+            </span>
+        </a>
 
-        <header>
-            <p
-                style="
-                    margin: 0 0 12px;
-                    color: var(--accent-light);
-                    font-family: var(--font-display);
-                    font-size: 0.72rem;
-                    font-weight: 700;
-                    letter-spacing: 0.16em;
-                    text-transform: uppercase;
-                "
-            >
-                EduShield / Administration
-            </p>
-            <h1>Mentor assignments</h1>
-        </header>
+        <div class="navbar-right">
+            <span class="user-chip">
+                <span class="online-dot"></span>
+                {{ current_user.get('name', 'Administrator') if current_user else 'Administrator' }} · ADM
+            </span>
+            <a href="/admin-dashboard" class="button-secondary button-small" style="text-decoration: none;">
+                ◈ Dashboard Overview
+            </a>
+            <a href="/logout" class="logout-link">Sign out ↗</a>
+        </div>
+    </header>
 
-        <nav style="margin: 12px 0 24px; font-size: 0.85rem;">
-            <a href="/admin-dashboard">Overview</a> ·
-            <a href="/admin-users">Users</a> ·
-            <a href="/admin-assign">Assignments</a> ·
-            <a href="/logout">Sign out</a>
-        </nav>
+    <!-- Main Layout: Sidebar + Content -->
+    <div class="admin-layout">
 
-        {% if message %}
-            <div class="info-box" role="status">{{ message }}</div>
-        {% endif %}
-        {% if error %}
-            <div class="error-message" role="alert">{{ error }}</div>
-        {% endif %}
+        <!-- Left Sidebar Navigation -->
+        <aside class="admin-sidebar">
+            <div>
+                <div class="admin-nav-category">
+                    <span class="admin-nav-category-dot"></span>
+                    Oversight & Navigation
+                </div>
 
-        <form method="POST" class="login-form">
-            <input type="hidden" name="action" value="assign">
+                <nav class="admin-nav-group">
+                    <a href="/admin-dashboard#overview" class="admin-nav-link">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">◈</span>
+                            <span>Overview</span>
+                        </span>
+                    </a>
 
-            <div class="form-group">
-                <label for="assignments">
-                    Bulk assign (one per line: student_id,mentor_id)
-                </label>
-                <textarea
-                    id="assignments"
-                    name="assignments"
-                    rows="6"
-                    placeholder="24STUCHH010221,M021&#10;24STUCHH010238,M045"
-                ></textarea>
+                    <a href="/admin-dashboard#students" class="admin-nav-link">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">🎓</span>
+                            <span>Students</span>
+                        </span>
+                    </a>
+
+                    <a href="/admin-dashboard#mentors" class="admin-nav-link">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">👔</span>
+                            <span>Mentors</span>
+                        </span>
+                    </a>
+
+                    <a href="/admin-dashboard#pending" class="admin-nav-link">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">⏳</span>
+                            <span>Pending Activation</span>
+                        </span>
+                    </a>
+
+                    <a href="/admin-dashboard#assessments" class="admin-nav-link">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">🛡️</span>
+                            <span>AI Assessments</span>
+                        </span>
+                    </a>
+
+                    <a href="/admin-dashboard#reports" class="admin-nav-link">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">📊</span>
+                            <span>Reports & Analytics</span>
+                        </span>
+                    </a>
+
+                    <a href="/admin-dashboard#activity" class="admin-nav-link">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">🕒</span>
+                            <span>Recent Activity</span>
+                        </span>
+                    </a>
+                </nav>
+
+                <div class="admin-nav-category" style="margin-top: 18px;">
+                    <span class="admin-nav-category-dot"></span>
+                    Administrative Actions
+                </div>
+
+                <nav class="admin-nav-group">
+                    <a href="/admin-assign" class="admin-nav-link active">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">⚙️</span>
+                            <span>Mentor Assignments</span>
+                        </span>
+                    </a>
+
+                    <a href="/admin-users" class="admin-nav-link">
+                        <span class="admin-nav-item-left">
+                            <span class="admin-nav-icon">👥</span>
+                            <span>Full User Directory</span>
+                        </span>
+                        <span class="button-arrow" style="font-size: 0.75rem;">↗</span>
+                    </a>
+                </nav>
             </div>
 
-            <button type="submit" class="btn-primary">
-                Assign mentors
-            </button>
-        </form>
+            <!-- Sidebar System Card -->
+            <div class="admin-sidebar-footer">
+                <div class="admin-system-status">
+                    <span>SECURITY ENGINE</span>
+                    <span class="admin-system-indicator">
+                        <span class="online-dot"></span>
+                        ACTIVE
+                    </span>
+                </div>
+                <div style="margin-top: 8px; font-size: 0.72rem; color: var(--text-secondary); line-height: 1.5;">
+                    Role Scoping: Mentors only access assigned students.
+                </div>
+            </div>
+        </aside>
 
-        <hr style="margin: 28px 0; border-color: rgba(255,255,255,0.12);">
+        <!-- Main Content -->
+        <main class="admin-main">
 
-        <form method="POST" class="login-form">
-            <input type="hidden" name="action" value="unassign">
+            {% if message %}
+            <div class="info-box" role="status" style="margin-bottom: 24px; background: rgba(52, 211, 153, 0.09); border: 1px solid rgba(52, 211, 153, 0.28); color: #6ee7b7; border-radius: 14px; padding: 16px;">
+                <span style="font-size: 1.1rem;">✓</span>
+                <div>
+                    <strong style="color: #ffffff;">Action Successful</strong>
+                    <p style="margin: 4px 0 0; color: #a7f3d0;">{{ message }}</p>
+                </div>
+            </div>
+            {% endif %}
 
-            <div class="form-group">
-                <label for="student_ids">
-                    Unassign (one student_id per line)
-                </label>
-                <textarea
-                    id="student_ids"
-                    name="student_ids"
-                    rows="4"
-                    placeholder="24STUCHH010221"
-                ></textarea>
+            {% if error %}
+            <div class="dashboard-alert" role="alert" style="margin-bottom: 24px;">
+                <span>!</span>
+                <div>
+                    <strong>Action Error</strong>
+                    <p>{{ error }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="admin-panel-card">
+                <div class="admin-panel-header">
+                    <div>
+                        <div class="eyebrow">
+                            <span class="eyebrow-dot"></span>
+                            FACULTY ALLOCATIONS
+                        </div>
+                        <h2>Mentor Assignment &amp; Workload Management<span class="heading-period">.</span></h2>
+                        <p>Map students to faculty mentors in bulk. Mentor review permissions and phone change authorizations are strictly scoped to assigned students.</p>
+                    </div>
+
+                    <a href="/admin-dashboard" class="button-secondary button-small">
+                        ← Back to Dashboard
+                    </a>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 28px; margin-top: 14px;">
+
+                    <!-- Bulk Assign Card -->
+                    <div style="padding: 24px; border-radius: 18px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border);">
+                        <div class="eyebrow" style="margin-bottom: 8px;">MAPPING PROTOCOL</div>
+                        <h3 style="margin: 0 0 10px; font: 700 1.25rem var(--font-display); color: #ffffff;">
+                            Bulk Assign Mentors
+                        </h3>
+                        <p style="color: var(--text-secondary); font-size: 0.82rem; line-height: 1.6; margin-bottom: 18px;">
+                            Enter one assignment per line in <code>student_id,mentor_id</code> format. Existing assignments will be smoothly updated to the new mentor.
+                        </p>
+
+                        <form method="POST" class="login-form">
+                            <input type="hidden" name="action" value="assign">
+
+                            <div class="form-group">
+                                <label for="assignments" style="color: var(--text-secondary); font-size: 0.78rem; font-weight: 700;">
+                                    ASSIGNMENT PAIRS (student_id,mentor_id)
+                                </label>
+                                <textarea
+                                    id="assignments"
+                                    name="assignments"
+                                    rows="7"
+                                    placeholder="24STUCHH010221,M021&#10;24STUCHH010238,M045&#10;24STUCHH010244,M067"
+                                    style="width: 100%; padding: 14px; border-radius: 12px; background: rgba(0, 0, 0, 0.35); border: 1px solid var(--border-strong); color: #ffffff; font-family: monospace; font-size: 0.84rem; line-height: 1.7; outline: none;"
+                                ></textarea>
+                            </div>
+
+                            <button type="submit" class="button-primary" style="width: 100%; margin-top: 8px;">
+                                <span>＋</span> Execute Bulk Assignment
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Unassign Card -->
+                    <div style="padding: 24px; border-radius: 18px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border);">
+                        <div class="eyebrow" style="margin-bottom: 8px;">DEALLOCATION PROTOCOL</div>
+                        <h3 style="margin: 0 0 10px; font: 700 1.25rem var(--font-display); color: #ffffff;">
+                            Unassign Students
+                        </h3>
+                        <p style="color: var(--text-secondary); font-size: 0.82rem; line-height: 1.6; margin-bottom: 18px;">
+                            Deactivate active mentor assignments for specific students. Enter one Student ID per line.
+                        </p>
+
+                        <form method="POST" class="login-form">
+                            <input type="hidden" name="action" value="unassign">
+
+                            <div class="form-group">
+                                <label for="student_ids" style="color: var(--text-secondary); font-size: 0.78rem; font-weight: 700;">
+                                    STUDENT IDS TO UNASSIGN (one per line)
+                                </label>
+                                <textarea
+                                    id="student_ids"
+                                    name="student_ids"
+                                    rows="7"
+                                    placeholder="24STUCHH010221&#10;24STUCHH010238"
+                                    style="width: 100%; padding: 14px; border-radius: 12px; background: rgba(0, 0, 0, 0.35); border: 1px solid var(--border-strong); color: #ffffff; font-family: monospace; font-size: 0.84rem; line-height: 1.7; outline: none;"
+                                ></textarea>
+                            </div>
+
+                            <button type="submit" class="button-secondary" style="width: 100%; margin-top: 8px; border-color: rgba(251, 113, 133, 0.3); color: #fda4af;">
+                                <span>✕</span> Unassign Selected Students
+                            </button>
+                        </form>
+                    </div>
+
+                </div>
+
+                <!-- Reference Table of Known Mentors -->
+                <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+                    <div class="eyebrow">QUICK REFERENCE</div>
+                    <h4 style="margin: 6px 0 12px; color: #ffffff; font-size: 0.95rem;">Active Faculty Mentors in Database</h4>
+                    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                        <span class="admin-badge badge-role-mentor" style="padding: 8px 14px;">
+                            👔 M021 · Harsha (Computer Science)
+                        </span>
+                        <span class="admin-badge badge-role-mentor" style="padding: 8px 14px;">
+                            👔 M045 · Dr. Meera Nair (Electronics)
+                        </span>
+                        <span class="admin-badge badge-role-mentor" style="padding: 8px 14px;">
+                            👔 M067 · Dr. Salim Khan (Mechanical)
+                        </span>
+                    </div>
+                </div>
+
             </div>
 
-            <button type="submit" class="btn-primary">
-                Unassign mentors
-            </button>
-        </form>
-
-    </section>
-</main>
+        </main>
+    </div>
 
 </body>
 </html>

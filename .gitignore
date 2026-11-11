@@ -50,4 +50,15 @@ backups/
 # Temporary files
 # =========================
 *.tmp
-*.temp
+*.temp.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+node_modules/
+.git/
+.env
+.env.*
+!.env.example

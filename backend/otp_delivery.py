@@ -217,6 +217,23 @@ class BrevoEmailProvider:
 
         if response.status_code >= 300:
             detail = _response_detail(response, api_key, to_address)
+
+            if response.status_code == 401:
+                lowered = str(detail or "").lower()
+                if "ip" in lowered or "address" in lowered or "not authorized" in lowered:
+                    raise DeliveryError(
+                        "Brevo rejected email (HTTP 401): the backend's "
+                        "outbound IP address is not authorized in Brevo. "
+                        "Configure a static egress IP or VPN and authorize "
+                        "that exact address in Brevo. "
+                        f"Provider detail: {detail or 'unauthorized'}"
+                    )
+                raise DeliveryError(
+                    "Brevo rejected email (HTTP 401): unauthorized request. "
+                    "Verify BREVO_API_KEY and authorized sender settings. "
+                    f"Provider detail: {detail or 'unauthorized'}"
+                )
+
             raise DeliveryError(
                 f"Brevo rejected email (HTTP {response.status_code}): "
                 f"{detail or 'no detail returned'}"

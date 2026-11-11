@@ -700,6 +700,30 @@ def request_phone_change(current_user):
                     error="Backend did not return a request ID."
                 )
 
+            verification_url = data.get("verification_url")
+            parent_delivery = data.get("parent_delivery") or {}
+            email_failed = parent_delivery.get("email") is False
+
+            if verification_url or email_failed:
+                message = "Phone change request submitted."
+                if email_failed:
+                    message += (
+                        " WARNING: The verification email could not be delivered. "
+                        "Use the verification link below and its 'Resend codes' "
+                        "button to retry email delivery."
+                    )
+                if verification_url:
+                    message += " Verification link: " + verification_url
+
+                return render_template(
+                    "request-phone-change.html",
+                    old_phone=old_phone,
+                    new_phone=new_phone,
+                    success=message,
+                    verification_url=verification_url,
+                    email_failed=email_failed
+                )
+
             return redirect("/student-dashboard")
 
         return render_template(
@@ -1391,6 +1415,13 @@ def delete_phone_change(request_id, current_user):
         return redirect("/student-dashboard")
 
     try:
+        # Deleting a request must actually cancel it first, so it stops
+        # being processed, then hide it from the student's list.
+        requests.post(
+            f"{BACKEND_URL}/phone-change-requests/{request_id}/cancel",
+            headers=get_auth_headers(token),
+            timeout=REQUEST_TIMEOUT
+        )
         requests.post(
             f"{BACKEND_URL}/phone-change-requests/{request_id}/delete",
             headers=get_auth_headers(token),
@@ -1568,6 +1599,7 @@ def admin_dashboard(current_user):
     headers = _admin_headers()
 
     summary = {}
+    requests_list = []
     error = None
 
     try:
@@ -1579,18 +1611,46 @@ def admin_dashboard(current_user):
         data = safe_json(response)
 
         if response.status_code == 200:
-            summary = data.get("summary", {})
+            summary = data.get("summary", {}) or {}
         else:
             error = data.get("message", "Failed to load summary.")
 
     except requests.RequestException as e:
-        print("🔥 ADMIN SUMMARY ERROR:", repr(e), flush=True)
+        print("ADMIN SUMMARY ERROR:", repr(e), flush=True)
         error = "Unable to connect to backend server."
+    except Exception as e:
+        print("ADMIN SUMMARY ERROR:", repr(e), flush=True)
+        error = "Unable to load the dashboard right now."
+
+    try:
+        response = requests.get(
+            f"{BACKEND_URL}/phone-change-requests",
+            headers=headers,
+            timeout=REQUEST_TIMEOUT
+        )
+        data = safe_json(response)
+
+        if response.status_code == 200:
+            requests_list = data.get("requests", []) or []
+        else:
+            if error is None:
+                error = data.get("message", "Failed to load requests.")
+
+    except requests.RequestException as e:
+        print("ADMIN REQUESTS ERROR:", repr(e), flush=True)
+        if error is None:
+            error = "Unable to connect to backend server."
+    except Exception as e:
+        print("ADMIN REQUESTS ERROR:", repr(e), flush=True)
+        if error is None:
+            error = "Unable to load the dashboard right now."
 
     return render_template(
         "admin-dashboard.html",
         summary=summary,
-        error=error
+        requests=requests_list,
+        error=error,
+        current_user=current_user
     )
 
 

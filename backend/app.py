@@ -2857,6 +2857,7 @@ def create_phone_change_request():
         "status": "PENDING",
         "auth_status": "PENDING",
         "parent_delivery": delivery,
+        "verification_url": verify_url,
         "ai_assessment": None,
         "note": (
             "AI risk assessment runs after the parent completes "

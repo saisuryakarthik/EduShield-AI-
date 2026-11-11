@@ -387,3 +387,35 @@ class NotificationNoFallbackTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class BrevoHttp401Tests(unittest.TestCase):
+    def setUp(self):
+        self.provider = otp_delivery.BrevoEmailProvider()
+        patches = [
+            mock.patch.object(otp_delivery, "BREVO_API_KEY", "test-brevo-key"),
+            mock.patch.object(otp_delivery, "BREVO_SENDER_EMAIL", "sender@example.test"),
+        ]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+
+    def test_brevo_http_401_is_failure(self):
+        response = FakeResponse(401, {"code": "unauthorized", "message": "unauthorized"})
+        with mock.patch.object(otp_delivery.requests, "post", return_value=response):
+            with self.assertRaises(DeliveryError):
+                self.provider.send_email("parent@example.test", "subject", "body")
+
+    def test_brevo_http_401_unrecognized_ip_is_classified(self):
+        response = FakeResponse(
+            401, {"code": "unauthorized", "message": "IP address not authorized"}
+        )
+        with mock.patch.object(otp_delivery.requests, "post", return_value=response):
+            with self.assertRaisesRegex(DeliveryError, "outbound IP address is not authorized"):
+                self.provider.send_email("parent@example.test", "subject", "body")
+
+    def test_brevo_successful_delivery(self):
+        response = FakeResponse(201, {"messageId": "<msg@brevo>"})
+        with mock.patch.object(otp_delivery.requests, "post", return_value=response):
+            result = self.provider.send_email("parent@example.test", "subject", "body")
+        self.assertTrue(result["success"])
+        self.assertEqual(result["message_id"], "<msg@brevo>")

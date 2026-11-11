@@ -1,0 +1,11 @@
+name = "edushield-parent-verify"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+workers_dev = true
+
+[vars]
+ALLOWED_PATH_PREFIXES = "/parent/verify/,/parent/resend/,/parent/report/"
+
+[[kv_namespaces]]
+binding = "TUNNEL_KV"
+id = "af70a88b36764b15855b6fd6f3706750"
